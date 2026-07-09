@@ -1901,5 +1901,54 @@ function SavingsArcade() {
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(React.createElement(SavingsArcade));
 </script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My GitHub Sync App</title>
+</head>
+<body>
+
+    <!-- Your App's HTML Structure goes here -->
+    <h1>Firebase Sync App</h1>
+
+    <!-- 1. PLACE YOUR CODE HERE IN A MODULE SCRIPT -->
+    <script type="module">
+        // Import Firebase SDKs from a CDN (Content Delivery Network)
+        import { initializeApp } from "https://gstatic.com";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://gstatic.com";
+
+        // Your Firebase config from the Firebase Console
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // Write data
+        async function saveUserData(userId, githubData) {
+            await setDoc(doc(db, "users", userId), {
+                data: githubData
+            });
+        }
+
+        // Listen for automatic changes
+        function listenToUserData(userId) {
+            const unsubscribe = onSnapshot(doc(db, "users", userId), (doc) => {
+                console.log("Current data: ", doc.data());
+                // Update your HTML elements here
+            });
+        }
+
+        // Note: You must trigger these functions inside this script block
+    </script>
 </body>
 </html>
