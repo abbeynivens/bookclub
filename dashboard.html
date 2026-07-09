@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Protected Dashboard</title>
+    <!-- Hide the content by default to prevent flashing before auth check -->
+    <style> body { display: none; } </style> 
+</head>
+<body>
+    <h1>Welcome to the Secret Dashboard</h1>
+    <p>This content is protected by Firebase Authentication.</p>
+    <button id="logoutBtn">Log Out</button>
+
+    <script type="module">
+        import { auth, onAuthStateChanged, signOut } from './firebase-config.js';
+
+        // Check if user is logged in
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                // User is authenticated, make the content visible
+                document.body.style.display = 'block';
+            } else {
+                // User is not authenticated, kick them back to login page
+                window.location.href = 'login.html';
+            }
+        });
+
+        // Handle Logout
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            signOut(auth).then(() => {
+                window.location.href = 'login.html';
+            });
+        });
+    </script>
+</body>
+</html>
