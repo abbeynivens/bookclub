@@ -42,14 +42,6 @@ window.storage = {
     if (v === null) return null;
     return { key, value: v, shared: !!shared };
   },
-onAuthStateChanged(auth, (user) => {
-  if (user) {
-    // User is signed in, display the protected content
-    document.getElementById("secret-content").style.display = "block";
-  } else {
-    // User is not signed in, redirect to login page
-    window.location.href = "/login.html";
-  },
   async set(key, value, shared) {
     localStorage.setItem(key, value);
     return { key, value, shared: !!shared };
