@@ -1913,12 +1913,12 @@ root.render(React.createElement(SavingsArcade));
     <!-- Your App's HTML Structure goes here -->
     <h1>Firebase Sync App</h1>
 
-    <!-- 1. PLACE YOUR CODE HERE IN A MODULE SCRIPT -->
+   <!-- 1. ADD THE INPUT FIELD IN THE BODY -->
+    <input type="text" id="githubStatus" placeholder="Update your GitHub Status...">
+
     <script type="module">
-        // Import Firebase SDKs from a CDN (Content Delivery Network)
         import { initializeApp } from "https://gstatic.com";
         import { getFirestore, doc, setDoc, onSnapshot } from "https://gstatic.com";
-
         // Your Firebase config from the Firebase Console
         const firebaseConfig = {
             apiKey: "AIzaSyCMg1-r160vp81YopUjAL-n_s9_KZdAuhA",
