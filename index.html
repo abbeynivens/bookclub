@@ -42,6 +42,36 @@ window.storage = {
     if (v === null) return null;
     return { key, value: v, shared: !!shared };
   },
+import { signInWithEmailAndPassword } from "firebase/auth";
+
+const loginForm = document.querySelector('#login-form');
+
+loginForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const email = loginForm['email'].value;
+  const password = loginForm['password'].value;
+
+  signInWithEmailAndPassword(auth, email, password)
+    .then((userCredential) => {
+      // User is signed in, redirect them to the protected content
+      window.location.href = "/dashboard.html";
+    })
+    .catch((error) => {
+      console.error(error.message);
+    });
+});
+  import { onAuthStateChanged } from "firebase/auth";
+
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    // User is signed in, display the protected content
+    document.getElementById("secret-content").style.display = "block";
+  } else {
+    // User is not signed in, redirect to login page
+    window.location.href = "/login.html";
+  }
+});
+
   async set(key, value, shared) {
     localStorage.setItem(key, value);
     return { key, value, shared: !!shared };
