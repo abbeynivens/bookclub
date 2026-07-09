@@ -1916,6 +1916,13 @@ root.render(React.createElement(SavingsArcade));
    <!-- 1. ADD THE INPUT FIELD IN THE BODY -->
     <input type="text" id="githubStatus" placeholder="Update your GitHub Status...">
 
+  // ❌ INCORRECT (Causes the CORS / net::ERR_FAILED error)
+     import { initializeApp } from "https://gstatic.com/"; 
+
+  //  CORRECT (Must include the full path to the specific JavaScript file)
+      import { initializeApp } from "https://gstatic.com";
+      import { getFirestore } from "https://gstatic.com";
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com";
         import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com";
