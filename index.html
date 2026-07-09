@@ -1921,34 +1921,51 @@ root.render(React.createElement(SavingsArcade));
 
         // Your Firebase config from the Firebase Console
         const firebaseConfig = {
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_AUTH_DOMAIN",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_STORAGE_BUCKET",
-            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-            appId: "YOUR_APP_ID"
+            apiKey: "AIzaSyCMg1-r160vp81YopUjAL-n_s9_KZdAuhA",
+            authDomain: "book-club-1cd49.firebaseapp.com",
+            projectId: "book-club-1cd49",
+            storageBucket: "book-club-1cd49.firebasestorage.app",
+            messagingSenderId: "968129985056",
+            appId: "1:968129985056:web:dc6f4ad8046a30023d5a45",
         };
 
-        // Initialize Firebase
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        // Write data
+        // Your existing write function
         async function saveUserData(userId, githubData) {
             await setDoc(doc(db, "users", userId), {
                 data: githubData
             });
         }
 
-        // Listen for automatic changes
+        // Your existing listener function
         function listenToUserData(userId) {
             const unsubscribe = onSnapshot(doc(db, "users", userId), (doc) => {
                 console.log("Current data: ", doc.data());
-                // Update your HTML elements here
+                
+                // 2. AUTOMATIC READ: Update the text box automatically if changed on another device
+                if (doc.exists() && document.activeElement !== statusInput) {
+                    statusInput.value = doc.data().data;
+                }
             });
         }
 
-        // Note: You must trigger these functions inside this script block
+        // =========================================================
+        // 3. PLACE THE AUTOMATIC SAVE LOGIC HERE (AT THE BOTTOM)
+        // =========================================================
+        
+        const statusInput = document.getElementById('githubStatus');
+        const mockUserId = "user_12345"; // Replace this with your actual logged-in user ID later
+
+        // Start listening to database changes immediately when the page loads
+        listenToUserData(mockUserId);
+
+        // Save to database automatically every time the user types
+        statusInput.addEventListener('input', (event) => {
+            const currentTypedText = event.target.value;
+            saveUserData(mockUserId, currentTypedText); 
+        });
     </script>
 </body>
 </html>
