@@ -1896,14 +1896,6 @@ function SavingsArcade() {
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(React.createElement(SavingsArcade));
   rules_version = '2';
-
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
 </script>
 </body>
 </html>
