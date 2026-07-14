@@ -241,7 +241,7 @@ async function sha256(str) {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
-// Dave Ramsey's suggested budget percentages of take-home pay
+// Suggested budget percentages of take-home pay
 // (Saving is shown separately near Goals rather than as a spend envelope)
 const RAMSEY_ENVELOPES = [{
   name: "Giving",
@@ -1532,7 +1532,7 @@ function SavingsArcade() {
     onClick: handleSetPay
   }, "Save")), /*#__PURE__*/React.createElement("div", {
     className: "arc-panelNote"
-  }, M > 0 ? `Envelope budgets are calculated from this amount using Dave Ramsey's suggested percentages.` : "Set this to generate your envelope budgets."), M > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  }, M > 0 ? `Envelope budgets are calculated from this amount using the suggested percentages.` : "Set this to generate your envelope budgets."), M > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "arc-allocBar"
   }, data.envelopes.map((e, i) => /*#__PURE__*/React.createElement("div", {
     key: e.id,
@@ -1544,7 +1544,7 @@ function SavingsArcade() {
     title: `${e.name}: ${e.pct}%`
   }))), /*#__PURE__*/React.createElement("div", {
     className: "arc-allocFoot"
-  }, /*#__PURE__*/React.createElement("span", null, totalPct, "% allocated (", fmt(totalBudget), "/mo)"), /*#__PURE__*/React.createElement("span", null, "+ Debt minimums: ", minPaymentPct, "% (", fmt(totalMinPayments), "/mo)"), /*#__PURE__*/React.createElement("span", null, "+ Goal contributions: ", goalMonthlyPct, "% (", fmt(totalGoalMonthly), "/mo)"), /*#__PURE__*/React.createElement("span", null, "Ramsey's saving guideline: ", RAMSEY_SAVING_PCT, "% (~", fmt(suggestedSaving), "/mo)"))), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("span", null, totalPct, "% allocated (", fmt(totalBudget), "/mo)"), /*#__PURE__*/React.createElement("span", null, "+ Debt minimums: ", minPaymentPct, "% (", fmt(totalMinPayments), "/mo)"), /*#__PURE__*/React.createElement("span", null, "+ Goal contributions: ", goalMonthlyPct, "% (", fmt(totalGoalMonthly), "/mo)"), /*#__PURE__*/React.createElement("span", null, "Saving guideline: ", RAMSEY_SAVING_PCT, "% (~", fmt(suggestedSaving), "/mo)"))), /*#__PURE__*/React.createElement("div", {
     className: "arc-panelNote"
   }, "Envelopes reset automatically each month — the prior month is saved to your Archive below. Goals and your Reward Fund carry over.")), /*#__PURE__*/React.createElement("div", {
     className: "arc-panel"
@@ -1685,7 +1685,7 @@ function SavingsArcade() {
       marginBottom: 14,
       marginTop: -8
     }
-  }, "For reference, Ramsey's guideline suggests saving ", RAMSEY_SAVING_PCT, "% of take-home (~", fmt(suggestedSaving), "/mo) — your actual goal contributions above may differ."), /*#__PURE__*/React.createElement("div", {
+  }, "For reference, the guideline suggests saving ", RAMSEY_SAVING_PCT, "% of take-home (~", fmt(suggestedSaving), "/mo) — your actual goal contributions above may differ."), /*#__PURE__*/React.createElement("div", {
     className: "arc-cards"
   }, data.envelopes.map(env => {
     const budget = round2(M * (env.pct / 100));
