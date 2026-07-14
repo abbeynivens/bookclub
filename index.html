@@ -1,0 +1,2705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Book Club</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.2/firebase-app-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.2/firebase-auth-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.2/firebase-firestore-compat.min.js"></script>
+<style>
+  html, body { margin: 0; padding: 0; background: #FAFAF9; }
+  #root { min-height: 100vh; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+// ============================================================
+// PASTE YOUR FIREBASE CONFIG HERE
+// Firebase console -> Project settings -> General -> Your apps -> SDK setup and configuration
+// ============================================================
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
+
+if (typeof firebase === "undefined") {
+  document.getElementById("root").innerHTML =
+    '<div style="max-width:480px;margin:80px auto;padding:24px;font-family:system-ui,sans-serif;text-align:center;color:#16181D;">' +
+    '<h2>Could not load Firebase</h2>' +
+    '<p>The Firebase SDK failed to load from the CDN. This is usually caused by an ad blocker, browser privacy extension, or corporate/network firewall blocking script requests. Try disabling any content/ad blockers for this page, or try a different network, then reload.</p>' +
+    "</div>";
+  throw new Error("Firebase SDK did not load — aborting app init.");
+}
+
+firebase.initializeApp(firebaseConfig);
+const firebaseAuth = firebase.auth();
+const firestoreDb = firebase.firestore();
+</script>
+
+<script>
+const {
+  useState,
+  useEffect,
+  useCallback
+} = React;
+const STYLE = `
+.arc-root {
+  --bg: #FAFAF9;
+  --surface: #FFFFFF;
+  --ink: #16181D;
+  --muted: #6B7280;
+  --line: #E4E4E0;
+  --accent: #2F5D4E;
+  --accent-soft: #E9EFEC;
+  --warn: #B4532A;
+  --warn-soft: #F5E9E3;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  min-height: 100%;
+  padding: 32px;
+  box-sizing: border-box;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.arc-root * { box-sizing: border-box; }
+.arc-mono { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+
+.arc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+}
+.arc-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
+.arc-subtitle { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
+.arc-headerRight { display: flex; align-items: center; gap: 24px; }
+
+.arc-streak { font-size: 12.5px; color: var(--muted); }
+.arc-streak b { color: var(--ink); font-weight: 600; }
+
+.arc-counter { text-align: right; }
+.arc-counterLabel { font-size: 10.5px; letter-spacing: 0.08em; color: var(--muted); text-transform: uppercase; margin-bottom: 2px; }
+.arc-counterValue { font-size: 24px; font-weight: 700; color: var(--accent); letter-spacing: -0.01em; }
+
+.arc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 8px; }
+@media (max-width: 720px) { .arc-grid { grid-template-columns: 1fr; } }
+
+.arc-panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+.arc-panelTitle { font-size: 12px; font-weight: 600; color: var(--ink); margin: 0 0 12px 0; display: flex; justify-content: space-between; align-items: center; }
+.arc-panelNote { font-size: 11.5px; color: var(--muted); margin-top: 8px; }
+
+.arc-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.arc-input, .arc-select {
+  background: var(--surface); border: 1px solid var(--line); color: var(--ink);
+  border-radius: 6px; padding: 8px 10px; font-size: 13px; font-family: inherit; flex: 1; min-width: 90px;
+}
+.arc-input::placeholder { color: #B5B5B0; }
+.arc-input:focus, .arc-select:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+.arc-btn {
+  background: var(--ink); color: #fff; border: none; border-radius: 6px; padding: 8px 16px;
+  font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.arc-btn:hover { background: var(--accent); }
+.arc-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.arc-btn:disabled { background: var(--line); color: var(--muted); cursor: not-allowed; }
+.arc-btnGhost {
+  background: transparent; border: 1px dashed var(--line); color: var(--muted);
+  border-radius: 6px; padding: 8px 12px; font-size: 12.5px; cursor: pointer; width: 100%;
+}
+.arc-btnGhost:hover { color: var(--ink); border-color: var(--accent); }
+.arc-btnSmall { padding: 5px 10px; font-size: 12px; }
+.arc-btnLink { background: none; border: none; color: var(--accent); font-size: 12px; cursor: pointer; padding: 0; font-weight: 600; }
+.arc-btnLink:hover { text-decoration: underline; }
+
+.arc-sectionTitle { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); margin: 32px 0 6px 0; display: flex; justify-content: space-between; align-items: center; }
+.arc-sectionSub { font-size: 12px; color: var(--muted); margin-bottom: 14px; }
+
+.arc-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+
+.arc-card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+.arc-cardHead { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; gap: 8px; }
+.arc-cardName { font-weight: 600; font-size: 13.5px; }
+.arc-cardAmt { font-size: 12px; color: var(--muted); }
+.arc-cardAmt.over { color: var(--warn); }
+.arc-cardPct { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--muted); margin-bottom: 8px; flex-wrap: wrap; }
+.arc-pctInput {
+  width: 44px; background: var(--accent-soft); border: 1px solid var(--line); border-radius: 4px;
+  padding: 2px 4px; font-size: 11px; text-align: right; color: var(--ink);
+}
+.arc-editRow { display: flex; gap: 10px; margin-bottom: 10px; }
+.arc-editField { flex: 1; }
+.arc-editField label { display: block; font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); margin-bottom: 3px; }
+.arc-editInput {
+  width: 100%; background: var(--accent-soft); border: 1px solid var(--line); border-radius: 6px;
+  padding: 7px 8px; font-size: 14px; font-weight: 600; text-align: left; color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.arc-editInput:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); background: var(--surface); }
+.arc-editInput:disabled { color: var(--muted); cursor: not-allowed; }
+
+.arc-track { height: 6px; background: var(--accent-soft); border-radius: 3px; overflow: hidden; }
+.arc-trackFill { height: 100%; border-radius: 3px; transition: width 0.3s ease; background: var(--accent); }
+.arc-trackFill.over { background: var(--warn); }
+
+.arc-quest { padding: 18px 0 4px 0; }
+.arc-questTrack { height: 4px; background: var(--accent-soft); border-radius: 2px; position: relative; }
+.arc-questFill { height: 100%; border-radius: 2px; background: var(--accent); transition: width 0.4s ease; }
+.arc-questMarks { display: flex; justify-content: space-between; margin-top: 6px; }
+.arc-questMark { font-size: 10.5px; color: var(--line); }
+.arc-questMark.done { color: var(--accent); font-weight: 600; }
+
+.arc-rewards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.arc-reward { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+.arc-rewardAmt { font-size: 18px; font-weight: 700; color: var(--accent); margin-bottom: 2px; }
+.arc-rewardName { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+.arc-cardActions { display: flex; gap: 10px; margin-top: 10px; }
+.arc-cardEditRow { display: flex; gap: 6px; margin-bottom: 8px; }
+.arc-rewardActions { display: flex; justify-content: center; gap: 10px; margin-top: 8px; }
+.arc-rewardEditRow { display: flex; gap: 6px; margin-top: 8px; }
+
+.arc-tickets { max-height: 340px; overflow-y: auto; }
+.arc-ticket { display: flex; justify-content: space-between; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+.arc-ticket:last-child { border-bottom: none; }
+.arc-ticketPts { color: var(--accent); white-space: nowrap; }
+.arc-ticketPts.neg { color: var(--warn); }
+.arc-empty { color: var(--muted); font-size: 12.5px; text-align: center; padding: 20px 0; }
+
+.arc-newForm { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.arc-flash { margin-bottom: 16px; background: var(--accent-soft); color: var(--accent); border-radius: 6px; padding: 9px 14px; font-size: 13px; }
+
+.arc-allocBar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; margin-top: 10px; background: var(--accent-soft); }
+.arc-allocSeg { height: 100%; }
+.arc-allocFoot { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; font-size: 11.5px; color: var(--muted); margin-top: 6px; }
+
+.arc-totalCalc { display: flex; gap: 18px; flex-wrap: wrap; background: var(--accent-soft); color: var(--ink); border-radius: 8px; padding: 10px 14px; font-size: 12.5px; margin-bottom: 14px; }
+.arc-totalCalc.over { background: var(--warn-soft); }
+.arc-totalCalc b { font-weight: 700; }
+.arc-totalCalc.over b { color: var(--warn); }
+
+.arc-budgetInput { width: 74px; background: var(--accent-soft); border: 1px solid var(--line); border-radius: 4px; padding: 2px 4px; font-size: 11px; text-align: right; color: var(--ink); }
+
+.arc-archiveItem { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; }
+.arc-archiveHead { display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+.arc-archiveMonth { font-weight: 600; font-size: 13.5px; }
+.arc-archiveSummary { font-size: 12px; color: var(--muted); }
+.arc-archiveTable { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 12.5px; }
+.arc-archiveTable th { text-align: left; color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; padding: 4px 8px 6px 0; border-bottom: 1px solid var(--line); }
+.arc-archiveTable td { padding: 6px 8px 6px 0; border-bottom: 1px solid var(--line); }
+.arc-archiveTable td.over { color: var(--warn); }
+
+.arc-dragList { display: flex; flex-direction: column; gap: 6px; }
+.arc-dragRow {
+  display: flex; align-items: center; gap: 10px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 8px; padding: 10px 12px; cursor: grab; font-size: 12.5px;
+}
+.arc-dragRow:active { cursor: grabbing; }
+.arc-dragRow.dragging { opacity: 0.4; }
+.arc-dragHandle { color: var(--muted); font-size: 14px; user-select: none; }
+.arc-dragName { flex: 1; font-weight: 600; }
+.arc-dragMeta { color: var(--muted); font-size: 11.5px; }
+
+.arc-authWrap { min-height: 60vh; display: flex; align-items: center; justify-content: center; }
+.arc-authBox { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 32px; width: 100%; max-width: 320px; text-align: center; }
+.arc-authTitle { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+.arc-authSub { font-size: 12.5px; color: var(--muted); margin-bottom: 18px; }
+.arc-authInput { width: 100%; margin-bottom: 10px; text-align: center; }
+.arc-authError { color: var(--warn); font-size: 12px; margin-bottom: 10px; }
+.arc-authReset { margin-top: 14px; }
+`;
+const genId = () => Math.random().toString(36).slice(2, 10);
+const clone = o => JSON.parse(JSON.stringify(o));
+const todayStr = () => new Date().toISOString().slice(0, 10);
+const monthStr = () => new Date().toISOString().slice(0, 7);
+const fmt = n => `$${Number(n).toFixed(2)}`;
+const round2 = n => Math.round(n * 100) / 100;
+const monthLabel = m => {
+  const [y, mo] = m.split("-");
+  const d = new Date(parseInt(y), parseInt(mo) - 1, 1);
+  return d.toLocaleDateString(undefined, {
+    month: "long",
+    year: "numeric"
+  });
+};
+async function sha256(str) {
+  const enc = new TextEncoder().encode(str);
+  const buf = await crypto.subtle.digest("SHA-256", enc);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+// Dave Ramsey's suggested budget percentages of take-home pay
+// (Saving is shown separately near Goals rather than as a spend envelope)
+const RAMSEY_ENVELOPES = [{
+  name: "Giving",
+  pct: 10
+}, {
+  name: "Food",
+  pct: 11
+}, {
+  name: "Utilities",
+  pct: 5
+}, {
+  name: "Housing",
+  pct: 25
+}, {
+  name: "Transportation",
+  pct: 10
+}, {
+  name: "Health",
+  pct: 7
+}, {
+  name: "Insurance",
+  pct: 12
+}, {
+  name: "Recreation",
+  pct: 7
+}, {
+  name: "Personal Spending",
+  pct: 7
+}, {
+  name: "Miscellaneous",
+  pct: 5
+}];
+const RAMSEY_SAVING_PCT = 10;
+const REWARD_TIERS = [{
+  amount: 5,
+  name: "Coffee treat"
+}, {
+  amount: 10,
+  name: "Lunch out"
+}, {
+  amount: 25,
+  name: "New book"
+}, {
+  amount: 50,
+  name: "Nice dinner"
+}, {
+  amount: 100,
+  name: "Shopping spree"
+}, {
+  amount: 250,
+  name: "Weekend getaway"
+}, {
+  amount: 500,
+  name: "Big splurge"
+}];
+function freshData() {
+  return {
+    takeHomePay: 0,
+    rewardFund: 0,
+    fundedBalance: 0,
+    streak: 0,
+    lastActiveDate: null,
+    currentMonth: monthStr(),
+    envelopes: RAMSEY_ENVELOPES.map(e => ({
+      id: genId(),
+      name: e.name,
+      pct: e.pct,
+      spent: 0
+    })),
+    goals: [{
+      id: genId(),
+      name: "Emergency Fund",
+      target: 1000,
+      saved: 0,
+      monthlyTarget: 0,
+      completed: false
+    }],
+    debts: [],
+    bills: [],
+    paychecks: [],
+    planOrder: [],
+    planOverrides: {},
+    payYourselfFirst: false,
+    rewards: REWARD_TIERS.map(r => ({
+      id: genId(),
+      name: r.name,
+      amount: r.amount
+    })),
+    transactions: [],
+    archive: []
+  };
+}
+
+// Earning formulas: proportional to take-home pay (M) and to actual dollars saved/managed well.
+function onBudgetBonus(M) {
+  if (!M || M <= 0) return 0.25;
+  return round2(Math.min(3, Math.max(0.25, M * 0.0004)));
+}
+function savingMatchBonus(amount) {
+  return round2(amount * 0.03); // 3% match into reward fund
+}
+function goalCompleteBonus(target) {
+  return round2(target * 0.02); // 2% of the goal's target
+}
+function debtMatchBonus(amount) {
+  return round2(amount * 0.05); // 5% match — paying down debt earns a richer rate than saving
+}
+function debtPaidOffBonus(originalBalance) {
+  return round2(originalBalance * 0.03); // 3% of the original balance, paid off in full
+}
+function streakBonus(M, streak) {
+  if (!M || M <= 0) return round2(Math.min(2.5, 0.1 * streak));
+  return round2(Math.min(2.5, Math.max(0.1, M * 0.00015 * streak)));
+}
+function applyStreak(d) {
+  const today = todayStr();
+  let bonus = 0;
+  if (d.lastActiveDate !== today) {
+    if (d.lastActiveDate) {
+      const diff = Math.round((new Date(today) - new Date(d.lastActiveDate)) / 86400000);
+      d.streak = diff === 1 ? d.streak + 1 : 1;
+    } else {
+      d.streak = 1;
+    }
+    bonus = streakBonus(d.takeHomePay, d.streak);
+    d.lastActiveDate = today;
+    d.rewardFund = round2(d.rewardFund + bonus);
+  }
+  return bonus;
+}
+
+// Archives the current month's envelope spending + transactions, then resets for a new month.
+// Goals and reward fund are NOT touched -- those persist across months.
+function rolloverIfNeeded(d) {
+  if (!d.currentMonth) {
+    d.currentMonth = monthStr();
+    if (!d.archive) d.archive = [];
+    return d;
+  }
+  const nowMonth = monthStr();
+  if (d.currentMonth !== nowMonth) {
+    if (!d.archive) d.archive = [];
+    d.archive.unshift({
+      month: d.currentMonth,
+      takeHomePay: d.takeHomePay,
+      envelopes: d.envelopes.map(e => ({
+        name: e.name,
+        pct: e.pct,
+        budget: round2((d.takeHomePay || 0) * (e.pct / 100)),
+        spent: e.spent
+      })),
+      transactions: d.transactions
+    });
+    d.envelopes.forEach(e => {
+      e.spent = 0;
+    });
+    d.transactions = [];
+    d.currentMonth = nowMonth;
+  }
+  return d;
+}
+
+// Next occurrence (>= today) of a monthly recurring due day.
+function nextDueDate(dueDay, today) {
+  const d = new Date(today.getFullYear(), today.getMonth(), Math.min(dueDay, 28));
+  // handle due days beyond 28 by trying the real day, clamped to the month's last day
+  const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(dueDay, lastDayOfMonth));
+  d.setHours(0, 0, 0, 0);
+  if (d < today) {
+    const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+    const lastDayNext = new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0).getDate();
+    d.setFullYear(nextMonth.getFullYear(), nextMonth.getMonth(), Math.min(dueDay, lastDayNext));
+  }
+  return d;
+}
+
+// Builds a priority-ordered waterfall plan: bills (soonest due date first), then
+// debt minimum payments, then goal monthly contributions -- funded paycheck by paycheck,
+// in date order, flagging bills that a paycheck arrives too late to cover.
+function buildPlan(bills, paychecks, debts, goals, customOrder, payYourselfFirst, overrides) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  overrides = overrides || {};
+  const billItems = bills.filter(b => b.amount > 0).map(b => ({
+    type: "bill",
+    id: b.id,
+    name: b.name,
+    amount: b.amount,
+    dueDate: nextDueDate(b.dueDay, today)
+  }));
+  const debtItems = debts.filter(d => !d.paidOff && (d.minPayment || 0) > 0).map(d => ({
+    type: "debt",
+    id: d.id,
+    name: d.name,
+    amount: d.minPayment,
+    dueDate: d.dueDay ? nextDueDate(d.dueDay, today) : null
+  }));
+  const goalItems = goals.filter(g => !g.completed && (g.monthlyTarget || 0) > 0).map(g => ({
+    type: "goal",
+    id: g.id,
+    name: g.name,
+    amount: g.monthlyTarget,
+    dueDate: null
+  }));
+
+  // Default priority: dated items (bills + dated debts) soonest-due first, then undated debts, then goals --
+  // unless "pay yourself first" is on, in which case goals jump to the very front of the line.
+  const dated = [...billItems, ...debtItems].filter(i => i.dueDate).sort((a, b) => a.dueDate - b.dueDate);
+  const undatedDebts = debtItems.filter(i => !i.dueDate);
+  const defaultOrdered = payYourselfFirst ? [...goalItems, ...dated, ...undatedDebts] : [...dated, ...undatedDebts, ...goalItems];
+  defaultOrdered.forEach(item => {
+    item.key = `${item.type}:${item.id}`;
+  });
+  let orderedItems;
+  if (customOrder && customOrder.length > 0) {
+    const byKey = {};
+    defaultOrdered.forEach(item => {
+      byKey[item.key] = item;
+    });
+    const seen = {};
+    orderedItems = [];
+    customOrder.forEach(key => {
+      if (byKey[key] && !seen[key]) {
+        orderedItems.push(byKey[key]);
+        seen[key] = true;
+      }
+    });
+    // Append anything new (added since the custom order was last saved) at the end.
+    defaultOrdered.forEach(item => {
+      if (!seen[item.key]) orderedItems.push(item);
+    });
+  } else {
+    orderedItems = defaultOrdered;
+  }
+  const queue = orderedItems.map(item => ({
+    ...item,
+    remaining: item.amount
+  }));
+  const sortedPaychecks = paychecks.filter(p => p.amount > 0 && p.date).slice().sort((a, b) => new Date(a.date) - new Date(b.date));
+  const results = sortedPaychecks.map(p => {
+    let cash = p.amount;
+    const allocations = [];
+    for (const item of queue) {
+      const overrideKey = `${p.id}::${item.key}`;
+      const hasOverride = Object.prototype.hasOwnProperty.call(overrides, overrideKey);
+      if (!hasOverride && item.remaining <= 0) continue;
+      if (!hasOverride && cash <= 0) continue;
+      let apply;
+      if (hasOverride) {
+        apply = round2(Math.max(0, Math.min(overrides[overrideKey], item.remaining, Math.max(cash, 0))));
+      } else {
+        apply = round2(Math.min(cash, item.remaining));
+      }
+      cash = round2(cash - apply);
+      item.remaining = round2(item.remaining - apply);
+      const atRisk = item.dueDate && new Date(p.date) > item.dueDate;
+      if (apply > 0 || hasOverride) {
+        allocations.push({
+          key: item.key,
+          paycheckId: p.id,
+          type: item.type,
+          name: item.name,
+          amountApplied: apply,
+          fullyFunded: item.remaining <= 0.001,
+          dueDate: item.dueDate,
+          atRisk,
+          overridden: hasOverride
+        });
+      }
+    }
+    return {
+      paycheck: p,
+      allocations,
+      leftover: round2(cash)
+    };
+  });
+  const unfunded = queue.filter(item => item.remaining > 0.001);
+  return {
+    results,
+    unfunded,
+    orderedItems
+  };
+}
+function SavingsArcade() {
+  const [data, setData] = useState(null);
+  const [loaded, setLoaded] = useState(false);
+  const [payInput, setPayInput] = useState("");
+  const [expForm, setExpForm] = useState({
+    env: "",
+    amount: "",
+    vendor: "",
+    note: ""
+  });
+  const [saveForm, setSaveForm] = useState({
+    goal: "",
+    amount: ""
+  });
+  const [debtForm, setDebtForm] = useState({
+    debt: "",
+    amount: ""
+  });
+  const [showNewEnv, setShowNewEnv] = useState(false);
+  const [newEnv, setNewEnv] = useState({
+    name: "",
+    pct: ""
+  });
+  const [envBudgetDrafts, setEnvBudgetDrafts] = useState({});
+  const [showNewGoal, setShowNewGoal] = useState(false);
+  const [newGoal, setNewGoal] = useState({
+    name: "",
+    target: "",
+    monthlyTarget: ""
+  });
+  const [showNewDebt, setShowNewDebt] = useState(false);
+  const [newDebt, setNewDebt] = useState({
+    name: "",
+    balance: "",
+    minPayment: "",
+    dueDay: ""
+  });
+  const [showNewBill, setShowNewBill] = useState(false);
+  const [newBill, setNewBill] = useState({
+    name: "",
+    amount: "",
+    dueDay: ""
+  });
+  const [editingBillId, setEditingBillId] = useState(null);
+  const [editBillDraft, setEditBillDraft] = useState({
+    name: "",
+    amount: "",
+    dueDay: ""
+  });
+  const [showNewPaycheck, setShowNewPaycheck] = useState(false);
+  const [newPaycheck, setNewPaycheck] = useState({
+    amount: "",
+    date: ""
+  });
+  const [editingPaycheckId, setEditingPaycheckId] = useState(null);
+  const [editPaycheckDraft, setEditPaycheckDraft] = useState({
+    amount: "",
+    date: ""
+  });
+  const [draggedKey, setDraggedKey] = useState(null);
+  const [allocDrafts, setAllocDrafts] = useState({});
+  const [showNewReward, setShowNewReward] = useState(false);
+  const [newReward, setNewReward] = useState({
+    name: "",
+    amount: ""
+  });
+  const [editingRewardId, setEditingRewardId] = useState(null);
+  const [editRewardDraft, setEditRewardDraft] = useState({
+    name: "",
+    amount: ""
+  });
+  const [editingGoalId, setEditingGoalId] = useState(null);
+  const [editGoalDraft, setEditGoalDraft] = useState({
+    name: "",
+    target: "",
+    saved: "",
+    monthlyTarget: ""
+  });
+  const [editingDebtId, setEditingDebtId] = useState(null);
+  const [editDebtDraft, setEditDebtDraft] = useState({
+    name: "",
+    balance: "",
+    originalBalance: "",
+    minPayment: "",
+    dueDay: ""
+  });
+  const [flash, setFlash] = useState(null);
+  const [fundInput, setFundInput] = useState("");
+  const [expandedMonth, setExpandedMonth] = useState(null);
+  const [authUser, setAuthUser] = useState(undefined);
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authMode, setAuthMode] = useState("login");
+  const [authError, setAuthError] = useState("");
+  const [authBusy, setAuthBusy] = useState(false);
+  const [syncStatus, setSyncStatus] = useState("idle");
+  const [syncError, setSyncError] = useState("");
+  useEffect(() => {
+    const unsub = firebaseAuth.onAuthStateChanged(user => setAuthUser(user));
+    return () => unsub();
+  }, []);
+  const handleSignUp = async () => {
+    setAuthError("");
+    if (!authEmail || !authPassword || authPassword.length < 6) {
+      setAuthError("Enter an email and a password of at least 6 characters.");
+      return;
+    }
+    setAuthBusy(true);
+    try {
+      await firebaseAuth.createUserWithEmailAndPassword(authEmail, authPassword);
+    } catch (e) {
+      setAuthError(e.message);
+    }
+    setAuthBusy(false);
+  };
+  const handleLogIn = async () => {
+    setAuthError("");
+    if (!authEmail || !authPassword) {
+      setAuthError("Enter your email and password.");
+      return;
+    }
+    setAuthBusy(true);
+    try {
+      await firebaseAuth.signInWithEmailAndPassword(authEmail, authPassword);
+    } catch (e) {
+      setAuthError(e.message);
+    }
+    setAuthBusy(false);
+  };
+  const handleLogOut = async () => {
+    await firebaseAuth.signOut();
+  };
+  useEffect(() => {
+    if (!authUser) {
+      setData(null);
+      setLoaded(false);
+      return;
+    }
+    (async () => {
+      let d;
+      let loadFailed = false;
+      try {
+        const snap = await firestoreDb.collection("bookClubData").doc(authUser.uid).get();
+        if (snap.exists) {
+          d = snap.data();
+          if (!d.archive) d.archive = [];
+          if (!d.debts) d.debts = [];
+          d.debts.forEach(deb => {
+            if (typeof deb.minPayment !== "number") deb.minPayment = 0;
+          });
+          if (!d.goals) d.goals = [];
+          d.goals.forEach(g => {
+            if (typeof g.monthlyTarget !== "number") g.monthlyTarget = 0;
+          });
+          if (typeof d.fundedBalance !== "number") d.fundedBalance = 0;
+          if (!d.bills) d.bills = [];
+          if (!d.paychecks) d.paychecks = [];
+          if (!d.planOrder) d.planOrder = [];
+          if (!d.planOverrides) d.planOverrides = {};
+          if (typeof d.payYourselfFirst !== "boolean") d.payYourselfFirst = false;
+        } else {
+          d = freshData();
+        }
+      } catch (e) {
+        d = freshData();
+        loadFailed = true;
+        setSyncStatus("error");
+        setSyncError("Could not load your cloud data: " + (e.message || String(e)));
+      }
+      const before = d.currentMonth;
+      d = rolloverIfNeeded(d);
+      setData(d);
+      setPayInput(d.takeHomePay ? String(d.takeHomePay) : "");
+      setLoaded(true);
+      if (!loadFailed && before !== d.currentMonth) {
+        try {
+          await firestoreDb.collection("bookClubData").doc(authUser.uid).set(d);
+        } catch (e) {}
+      }
+    })();
+  }, [authUser]);
+  const persist = useCallback(async newData => {
+    setData(newData);
+    if (!authUser) return;
+    setSyncStatus("saving");
+    try {
+      await firestoreDb.collection("bookClubData").doc(authUser.uid).set(newData);
+      setSyncStatus("saved");
+      setSyncError("");
+    } catch (e) {
+      setSyncStatus("error");
+      setSyncError("Not saved to the cloud: " + (e.message || String(e)));
+    }
+  }, [authUser]);
+  const showFlash = msg => {
+    setFlash(msg);
+    setTimeout(() => setFlash(null), 2400);
+  };
+  if (authUser === undefined) {
+    return /*#__PURE__*/React.createElement("div", {
+      className: "arc-root"
+    }, /*#__PURE__*/React.createElement("style", null, STYLE), /*#__PURE__*/React.createElement("div", {
+      className: "arc-empty"
+    }, "Loading..."));
+  }
+  if (!authUser) {
+    return /*#__PURE__*/React.createElement("div", {
+      className: "arc-root"
+    }, /*#__PURE__*/React.createElement("style", null, STYLE), /*#__PURE__*/React.createElement("div", {
+      className: "arc-authWrap"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "arc-authBox"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "arc-authTitle"
+    }, "Book Club"), /*#__PURE__*/React.createElement("div", {
+      className: "arc-authSub"
+    }, authMode === "signup" ? "Create an account to sync your data across devices." : "Log in to access your budget."), authError && /*#__PURE__*/React.createElement("div", {
+      className: "arc-authError"
+    }, authError), /*#__PURE__*/React.createElement("input", {
+      className: "arc-input arc-authInput",
+      type: "email",
+      placeholder: "Email",
+      value: authEmail,
+      onChange: e => setAuthEmail(e.target.value),
+      autoFocus: true
+    }), /*#__PURE__*/React.createElement("input", {
+      className: "arc-input arc-authInput",
+      type: "password",
+      placeholder: "Password",
+      value: authPassword,
+      onChange: e => setAuthPassword(e.target.value),
+      onKeyDown: e => e.key === "Enter" && (authMode === "signup" ? handleSignUp() : handleLogIn())
+    }), /*#__PURE__*/React.createElement("button", {
+      className: "arc-btn",
+      disabled: authBusy,
+      onClick: authMode === "signup" ? handleSignUp : handleLogIn,
+      style: {
+        width: "100%"
+      }
+    }, authBusy ? "Please wait..." : authMode === "signup" ? "Sign up" : "Log in"), /*#__PURE__*/React.createElement("div", {
+      className: "arc-authReset"
+    }, authMode === "signup" ? /*#__PURE__*/React.createElement("button", {
+      className: "arc-btnLink",
+      onClick: () => {
+        setAuthMode("login");
+        setAuthError("");
+      },
+      style: {
+        color: "var(--muted)"
+      }
+    }, "Already have an account? Log in") : /*#__PURE__*/React.createElement("button", {
+      className: "arc-btnLink",
+      onClick: () => {
+        setAuthMode("signup");
+        setAuthError("");
+      },
+      style: {
+        color: "var(--muted)"
+      }
+    }, "New here? Create an account")))));
+  }
+  if (!loaded || !data) {
+    return /*#__PURE__*/React.createElement("div", {
+      className: "arc-root"
+    }, /*#__PURE__*/React.createElement("style", null, STYLE), /*#__PURE__*/React.createElement("div", {
+      className: "arc-empty"
+    }, "Loading..."));
+  }
+  const M = data.takeHomePay || 0;
+  const handleSetPay = () => {
+    const val = parseFloat(payInput);
+    if (!val || val <= 0) return;
+    const d = clone(data);
+    d.takeHomePay = round2(val);
+    persist(d);
+    showFlash("Take-home pay updated — envelope budgets recalculated.");
+  };
+  const handleAddExpense = () => {
+    const amount = parseFloat(expForm.amount);
+    if (!expForm.env || !amount || amount <= 0) return;
+    let d = clone(data);
+    d = rolloverIfNeeded(d);
+    const env = d.envelopes.find(e => e.id === expForm.env);
+    if (!env) return;
+    env.spent = round2(env.spent + amount);
+    const budget = round2((d.takeHomePay || 0) * (env.pct / 100));
+    const remaining = budget - env.spent;
+    const bonus = applyStreak(d);
+    const earned = remaining >= 0 ? onBudgetBonus(d.takeHomePay) : 0;
+    d.rewardFund = round2(d.rewardFund + earned);
+    d.transactions.unshift({
+      id: genId(),
+      text: `${env.name} · -${fmt(amount)}${expForm.vendor ? " @ " + expForm.vendor : ""}${expForm.note ? " (" + expForm.note + ")" : ""}`,
+      pts: round2(earned + bonus),
+      ts: Date.now()
+    });
+    persist(d);
+    setExpForm({
+      env: expForm.env,
+      amount: "",
+      vendor: "",
+      note: ""
+    });
+    showFlash(remaining >= 0 ? `+${fmt(earned + bonus)} to reward fund — on budget` : `Logged (over budget this month)`);
+  };
+  const handleAddSaving = () => {
+    const amount = parseFloat(saveForm.amount);
+    if (!saveForm.goal || !amount || amount <= 0) return;
+    let d = clone(data);
+    d = rolloverIfNeeded(d);
+    const goal = d.goals.find(g => g.id === saveForm.goal);
+    if (!goal) return;
+    goal.saved = Math.min(goal.target, round2(goal.saved + amount));
+    const bonus = applyStreak(d);
+    const earned = savingMatchBonus(amount);
+    d.rewardFund = round2(d.rewardFund + earned);
+    let gBonus = 0;
+    if (goal.saved >= goal.target && !goal.completed) {
+      goal.completed = true;
+      gBonus = goalCompleteBonus(goal.target);
+      d.rewardFund = round2(d.rewardFund + gBonus);
+    }
+    d.transactions.unshift({
+      id: genId(),
+      text: `${goal.name} · +${fmt(amount)} saved${gBonus ? " — goal hit" : ""}`,
+      pts: round2(earned + bonus + gBonus),
+      ts: Date.now()
+    });
+    persist(d);
+    setSaveForm({
+      goal: saveForm.goal,
+      amount: ""
+    });
+    showFlash(gBonus ? `Goal complete — +${fmt(earned + bonus + gBonus)}` : `+${fmt(earned + bonus)} to reward fund`);
+  };
+  const handleAddDebtPayment = () => {
+    const amount = parseFloat(debtForm.amount);
+    if (!debtForm.debt || !amount || amount <= 0) return;
+    let d = clone(data);
+    d = rolloverIfNeeded(d);
+    const debt = d.debts.find(x => x.id === debtForm.debt);
+    if (!debt) return;
+    debt.balance = Math.max(0, round2(debt.balance - amount));
+    const bonus = applyStreak(d);
+    const earned = debtMatchBonus(amount);
+    d.rewardFund = round2(d.rewardFund + earned);
+    let payoffBonus = 0;
+    if (debt.balance <= 0 && !debt.paidOff) {
+      debt.paidOff = true;
+      payoffBonus = debtPaidOffBonus(debt.originalBalance);
+      d.rewardFund = round2(d.rewardFund + payoffBonus);
+    }
+    d.transactions.unshift({
+      id: genId(),
+      text: `${debt.name} · -${fmt(amount)} paid down${payoffBonus ? " — debt paid off!" : ""}`,
+      pts: round2(earned + bonus + payoffBonus),
+      ts: Date.now()
+    });
+    persist(d);
+    setDebtForm({
+      debt: debtForm.debt,
+      amount: ""
+    });
+    showFlash(payoffBonus ? `Debt paid off — +${fmt(earned + bonus + payoffBonus)}` : `+${fmt(earned + bonus)} to reward fund`);
+  };
+  const handleRedeem = reward => {
+    if (data.rewardFund < reward.amount || data.fundedBalance < reward.amount) return;
+    let d = clone(data);
+    d = rolloverIfNeeded(d);
+    d.rewardFund = round2(d.rewardFund - reward.amount);
+    d.fundedBalance = round2(d.fundedBalance - reward.amount);
+    d.transactions.unshift({
+      id: genId(),
+      text: `Redeemed: ${reward.name} (${fmt(reward.amount)})`,
+      pts: -reward.amount,
+      ts: Date.now()
+    });
+    persist(d);
+    showFlash(`Redeemed ${reward.name} — ${fmt(reward.amount)}. Go spend it from your rewards account.`);
+  };
+  const handleFundRewards = () => {
+    const amount = parseFloat(fundInput);
+    if (!amount || amount <= 0) return;
+    const d = clone(data);
+    d.fundedBalance = round2(d.fundedBalance + amount);
+    d.transactions.unshift({
+      id: genId(),
+      text: `Moved ${fmt(amount)} into your real rewards account`,
+      pts: 0,
+      ts: Date.now()
+    });
+    persist(d);
+    setFundInput("");
+    showFlash(`+${fmt(amount)} funded — now backed by real money.`);
+  };
+  const updateEnvPct = (envId, pct) => {
+    const p = parseFloat(pct);
+    if (isNaN(p) || p < 0) return;
+    const d = clone(data);
+    const env = d.envelopes.find(e => e.id === envId);
+    if (!env) return;
+    env.pct = p;
+    persist(d);
+  };
+  const updateEnvBudget = (envId, dollarStr) => {
+    const amt = parseFloat(dollarStr);
+    if (isNaN(amt) || amt < 0 || !M || M <= 0) return;
+    const d = clone(data);
+    const env = d.envelopes.find(e => e.id === envId);
+    if (!env) return;
+    env.pct = round2(amt / M * 100);
+    persist(d);
+  };
+  const deleteEnvelope = envId => {
+    const d = clone(data);
+    d.envelopes = d.envelopes.filter(e => e.id !== envId);
+    persist(d);
+  };
+  const addEnvelope = () => {
+    const pct = parseFloat(newEnv.pct);
+    if (!newEnv.name.trim() || isNaN(pct) || pct <= 0) return;
+    const d = clone(data);
+    d.envelopes.push({
+      id: genId(),
+      name: newEnv.name.trim(),
+      pct,
+      spent: 0
+    });
+    persist(d);
+    setNewEnv({
+      name: "",
+      pct: ""
+    });
+    setShowNewEnv(false);
+  };
+  const addGoal = () => {
+    const target = parseFloat(newGoal.target);
+    const monthlyTarget = parseFloat(newGoal.monthlyTarget) || 0;
+    if (!newGoal.name.trim() || !target || target <= 0) return;
+    const d = clone(data);
+    d.goals.push({
+      id: genId(),
+      name: newGoal.name.trim(),
+      target,
+      saved: 0,
+      monthlyTarget,
+      completed: false
+    });
+    persist(d);
+    setNewGoal({
+      name: "",
+      target: "",
+      monthlyTarget: ""
+    });
+    setShowNewGoal(false);
+  };
+  const startEditGoal = g => {
+    setEditingGoalId(g.id);
+    setEditGoalDraft({
+      name: g.name,
+      target: String(g.target),
+      saved: String(g.saved),
+      monthlyTarget: String(g.monthlyTarget || 0)
+    });
+  };
+  const cancelEditGoal = () => {
+    setEditingGoalId(null);
+    setEditGoalDraft({
+      name: "",
+      target: "",
+      saved: "",
+      monthlyTarget: ""
+    });
+  };
+  const saveEditGoal = () => {
+    const target = parseFloat(editGoalDraft.target);
+    const saved = parseFloat(editGoalDraft.saved);
+    const monthlyTarget = parseFloat(editGoalDraft.monthlyTarget);
+    if (!editGoalDraft.name.trim() || !target || target <= 0 || isNaN(saved) || saved < 0) return;
+    const d = clone(data);
+    const g = d.goals.find(x => x.id === editingGoalId);
+    if (!g) return;
+    g.name = editGoalDraft.name.trim();
+    g.target = target;
+    g.saved = Math.min(target, saved);
+    g.monthlyTarget = isNaN(monthlyTarget) || monthlyTarget < 0 ? 0 : monthlyTarget;
+    g.completed = g.saved >= g.target;
+    persist(d);
+    setEditingGoalId(null);
+    setEditGoalDraft({
+      name: "",
+      target: "",
+      saved: "",
+      monthlyTarget: ""
+    });
+  };
+  const deleteGoal = id => {
+    const d = clone(data);
+    d.goals = d.goals.filter(g => g.id !== id);
+    persist(d);
+    if (editingGoalId === id) {
+      setEditingGoalId(null);
+      setEditGoalDraft({
+        name: "",
+        target: "",
+        saved: "",
+        monthlyTarget: ""
+      });
+    }
+  };
+  const addDebt = () => {
+    const balance = parseFloat(newDebt.balance);
+    const minPayment = parseFloat(newDebt.minPayment) || 0;
+    const dueDay = parseInt(newDebt.dueDay, 10);
+    if (!newDebt.name.trim() || !balance || balance <= 0) return;
+    const d = clone(data);
+    d.debts.push({
+      id: genId(),
+      name: newDebt.name.trim(),
+      originalBalance: balance,
+      balance,
+      minPayment,
+      dueDay: dueDay >= 1 && dueDay <= 31 ? dueDay : null,
+      paidOff: false
+    });
+    persist(d);
+    setNewDebt({
+      name: "",
+      balance: "",
+      minPayment: "",
+      dueDay: ""
+    });
+    setShowNewDebt(false);
+  };
+  const startEditDebt = deb => {
+    setEditingDebtId(deb.id);
+    setEditDebtDraft({
+      name: deb.name,
+      balance: String(deb.balance),
+      originalBalance: String(deb.originalBalance),
+      minPayment: String(deb.minPayment || 0),
+      dueDay: deb.dueDay ? String(deb.dueDay) : ""
+    });
+  };
+  const cancelEditDebt = () => {
+    setEditingDebtId(null);
+    setEditDebtDraft({
+      name: "",
+      balance: "",
+      originalBalance: "",
+      minPayment: "",
+      dueDay: ""
+    });
+  };
+  const saveEditDebt = () => {
+    const balance = parseFloat(editDebtDraft.balance);
+    const originalBalance = parseFloat(editDebtDraft.originalBalance);
+    const minPayment = parseFloat(editDebtDraft.minPayment);
+    const dueDay = parseInt(editDebtDraft.dueDay, 10);
+    if (!editDebtDraft.name.trim() || isNaN(balance) || balance < 0 || !originalBalance || originalBalance <= 0) return;
+    const d = clone(data);
+    const deb = d.debts.find(x => x.id === editingDebtId);
+    if (!deb) return;
+    deb.name = editDebtDraft.name.trim();
+    deb.originalBalance = originalBalance;
+    deb.balance = Math.min(originalBalance, balance);
+    deb.minPayment = isNaN(minPayment) || minPayment < 0 ? 0 : minPayment;
+    deb.dueDay = dueDay >= 1 && dueDay <= 31 ? dueDay : null;
+    deb.paidOff = deb.balance <= 0;
+    persist(d);
+    setEditingDebtId(null);
+    setEditDebtDraft({
+      name: "",
+      balance: "",
+      originalBalance: "",
+      minPayment: "",
+      dueDay: ""
+    });
+  };
+  const deleteDebt = id => {
+    const d = clone(data);
+    d.debts = d.debts.filter(x => x.id !== id);
+    persist(d);
+    if (editingDebtId === id) {
+      setEditingDebtId(null);
+      setEditDebtDraft({
+        name: "",
+        balance: "",
+        originalBalance: "",
+        minPayment: "",
+        dueDay: ""
+      });
+    }
+  };
+  const addBill = () => {
+    const amount = parseFloat(newBill.amount);
+    const dueDay = parseInt(newBill.dueDay, 10);
+    if (!newBill.name.trim() || !amount || amount <= 0) {
+      showFlash("Enter a bill name and amount.");
+      return;
+    }
+    if (!dueDay || dueDay < 1 || dueDay > 31) {
+      showFlash("Enter a due day between 1 and 31.");
+      return;
+    }
+    const d = clone(data);
+    d.bills.push({
+      id: genId(),
+      name: newBill.name.trim(),
+      amount: round2(amount),
+      dueDay
+    });
+    persist(d);
+    setNewBill({
+      name: "",
+      amount: "",
+      dueDay: ""
+    });
+    setShowNewBill(false);
+  };
+  const startEditBill = b => {
+    setEditingBillId(b.id);
+    setEditBillDraft({
+      name: b.name,
+      amount: String(b.amount),
+      dueDay: String(b.dueDay)
+    });
+  };
+  const cancelEditBill = () => {
+    setEditingBillId(null);
+    setEditBillDraft({
+      name: "",
+      amount: "",
+      dueDay: ""
+    });
+  };
+  const saveEditBill = () => {
+    const amount = parseFloat(editBillDraft.amount);
+    const dueDay = parseInt(editBillDraft.dueDay, 10);
+    if (!editBillDraft.name.trim() || !amount || amount <= 0 || !dueDay || dueDay < 1 || dueDay > 31) return;
+    const d = clone(data);
+    const b = d.bills.find(x => x.id === editingBillId);
+    if (!b) return;
+    b.name = editBillDraft.name.trim();
+    b.amount = round2(amount);
+    b.dueDay = dueDay;
+    persist(d);
+    setEditingBillId(null);
+    setEditBillDraft({
+      name: "",
+      amount: "",
+      dueDay: ""
+    });
+  };
+  const deleteBill = id => {
+    const d = clone(data);
+    d.bills = d.bills.filter(b => b.id !== id);
+    persist(d);
+    if (editingBillId === id) {
+      setEditingBillId(null);
+      setEditBillDraft({
+        name: "",
+        amount: "",
+        dueDay: ""
+      });
+    }
+  };
+  const addPaycheck = () => {
+    const amount = parseFloat(newPaycheck.amount);
+    if (!amount || amount <= 0 || !newPaycheck.date) {
+      showFlash("Enter a paycheck amount and date.");
+      return;
+    }
+    const d = clone(data);
+    d.paychecks.push({
+      id: genId(),
+      amount: round2(amount),
+      date: newPaycheck.date
+    });
+    persist(d);
+    setNewPaycheck({
+      amount: "",
+      date: ""
+    });
+    setShowNewPaycheck(false);
+  };
+  const startEditPaycheck = p => {
+    setEditingPaycheckId(p.id);
+    setEditPaycheckDraft({
+      amount: String(p.amount),
+      date: p.date
+    });
+  };
+  const cancelEditPaycheck = () => {
+    setEditingPaycheckId(null);
+    setEditPaycheckDraft({
+      amount: "",
+      date: ""
+    });
+  };
+  const saveEditPaycheck = () => {
+    const amount = parseFloat(editPaycheckDraft.amount);
+    if (!amount || amount <= 0 || !editPaycheckDraft.date) return;
+    const d = clone(data);
+    const p = d.paychecks.find(x => x.id === editingPaycheckId);
+    if (!p) return;
+    p.amount = round2(amount);
+    p.date = editPaycheckDraft.date;
+    persist(d);
+    setEditingPaycheckId(null);
+    setEditPaycheckDraft({
+      amount: "",
+      date: ""
+    });
+  };
+  const deletePaycheck = id => {
+    const d = clone(data);
+    d.paychecks = d.paychecks.filter(p => p.id !== id);
+    persist(d);
+    if (editingPaycheckId === id) {
+      setEditingPaycheckId(null);
+      setEditPaycheckDraft({
+        amount: "",
+        date: ""
+      });
+    }
+  };
+  const handleTogglePayYourselfFirst = () => {
+    const d = clone(data);
+    d.payYourselfFirst = !d.payYourselfFirst;
+    d.planOrder = []; // clear manual overrides so the new default order takes effect immediately
+    persist(d);
+    showFlash(d.payYourselfFirst ? "Goals now come first, ahead of bills and debts." : "Back to bills/debts by due date first.");
+  };
+  const handleReorderPlan = (draggedKey, targetKey) => {
+    if (draggedKey === targetKey) return;
+    const currentOrder = plan.orderedItems.map(item => item.key);
+    const fromIndex = currentOrder.indexOf(draggedKey);
+    const toIndex = currentOrder.indexOf(targetKey);
+    if (fromIndex === -1 || toIndex === -1) return;
+    const newOrder = currentOrder.slice();
+    newOrder.splice(fromIndex, 1);
+    newOrder.splice(toIndex, 0, draggedKey);
+    const d = clone(data);
+    d.planOrder = newOrder;
+    persist(d);
+  };
+  const handleResetPlanOrder = () => {
+    const d = clone(data);
+    d.planOrder = [];
+    persist(d);
+    showFlash("Priority order reset to automatic (soonest due date first).");
+  };
+  const handleSetAllocationOverride = (paycheckId, itemKey, amountStr) => {
+    const amount = parseFloat(amountStr);
+    if (isNaN(amount) || amount < 0) return;
+    const d = clone(data);
+    if (!d.planOverrides) d.planOverrides = {};
+    d.planOverrides[`${paycheckId}::${itemKey}`] = round2(amount);
+    persist(d);
+  };
+  const handleRemoveAllocation = (paycheckId, itemKey) => {
+    const d = clone(data);
+    if (!d.planOverrides) d.planOverrides = {};
+    d.planOverrides[`${paycheckId}::${itemKey}`] = 0;
+    persist(d);
+    showFlash("Removed from this paycheck — it'll roll to the next one automatically.");
+  };
+  const handleResetAllocationOverride = (paycheckId, itemKey) => {
+    const d = clone(data);
+    if (!d.planOverrides) return;
+    delete d.planOverrides[`${paycheckId}::${itemKey}`];
+    persist(d);
+  };
+  const addReward = () => {
+    if (!newReward.name.trim()) {
+      showFlash("Give the reward a name first.");
+      return;
+    }
+    const amount = parseFloat(newReward.amount);
+    if (isNaN(amount) || amount <= 0) {
+      showFlash("Enter a dollar amount greater than $0.");
+      return;
+    }
+    if (amount > 500) {
+      showFlash("Rewards are capped at $500.");
+      return;
+    }
+    const d = clone(data);
+    d.rewards.push({
+      id: genId(),
+      name: newReward.name.trim(),
+      amount: round2(amount)
+    });
+    persist(d);
+    setNewReward({
+      name: "",
+      amount: ""
+    });
+    setShowNewReward(false);
+    showFlash(`Added "${newReward.name.trim()}" — ${fmt(round2(amount))}`);
+  };
+  const startEditReward = r => {
+    setEditingRewardId(r.id);
+    setEditRewardDraft({
+      name: r.name,
+      amount: String(r.amount)
+    });
+  };
+  const cancelEditReward = () => {
+    setEditingRewardId(null);
+    setEditRewardDraft({
+      name: "",
+      amount: ""
+    });
+  };
+  const saveEditReward = () => {
+    const amount = parseFloat(editRewardDraft.amount);
+    if (!editRewardDraft.name.trim() || !amount || amount <= 0 || amount > 500) return;
+    const d = clone(data);
+    const r = d.rewards.find(x => x.id === editingRewardId);
+    if (!r) return;
+    r.name = editRewardDraft.name.trim();
+    r.amount = round2(amount);
+    persist(d);
+    setEditingRewardId(null);
+    setEditRewardDraft({
+      name: "",
+      amount: ""
+    });
+  };
+  const deleteReward = id => {
+    const d = clone(data);
+    d.rewards = d.rewards.filter(r => r.id !== id);
+    persist(d);
+    if (editingRewardId === id) {
+      setEditingRewardId(null);
+      setEditRewardDraft({
+        name: "",
+        amount: ""
+      });
+    }
+  };
+  const handleForceReset = () => {
+    let d = clone(data);
+    if (!d.archive) d.archive = [];
+    d.archive.unshift({
+      month: d.currentMonth,
+      takeHomePay: d.takeHomePay,
+      envelopes: d.envelopes.map(e => ({
+        name: e.name,
+        pct: e.pct,
+        budget: round2((d.takeHomePay || 0) * (e.pct / 100)),
+        spent: e.spent
+      })),
+      transactions: d.transactions
+    });
+    d.envelopes.forEach(e => {
+      e.spent = 0;
+    });
+    d.transactions = [];
+    d.currentMonth = monthStr();
+    persist(d);
+    showFlash(`${monthLabel(d.archive[0].month)} archived. Envelopes reset for a new month.`);
+  };
+  const totalPct = data.envelopes.reduce((s, e) => s + e.pct, 0);
+  const totalBudget = round2(M * (totalPct / 100));
+  const suggestedSaving = round2(M * (RAMSEY_SAVING_PCT / 100));
+  const totalMinPayments = data.debts.filter(deb => !deb.paidOff).reduce((s, deb) => s + (deb.minPayment || 0), 0);
+  const minPaymentPct = M > 0 ? round2(totalMinPayments / M * 100) : 0;
+  const totalGoalMonthly = data.goals.filter(g => !g.completed).reduce((s, g) => s + (g.monthlyTarget || 0), 0);
+  const goalMonthlyPct = M > 0 ? round2(totalGoalMonthly / M * 100) : 0;
+  const segColors = ["#2F5D4E", "#4E7C6D", "#6D9B8C", "#8CBAAB", "#3C6B5B", "#5A897A", "#79A899"];
+  const plan = buildPlan(data.bills, data.paychecks, data.debts, data.goals, data.planOrder, data.payYourselfFirst, data.planOverrides);
+  const fmtDate = dateStr => {
+    const d = dateStr instanceof Date ? dateStr : new Date(dateStr + "T00:00:00");
+    return d.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric"
+    });
+  };
+  const ordinal = n => {
+    const s = ["th", "st", "nd", "rd"];
+    const v = n % 100;
+    return n + (s[(v - 20) % 10] || s[v] || s[0]);
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "arc-root"
+  }, /*#__PURE__*/React.createElement("style", null, STYLE), /*#__PURE__*/React.createElement("div", {
+    className: "arc-header"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "arc-title"
+  }, "Book Club")), /*#__PURE__*/React.createElement("div", {
+    className: "arc-headerRight"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "arc-streak"
+  }, /*#__PURE__*/React.createElement("b", null, data.streak), " day streak"), /*#__PURE__*/React.createElement("div", {
+    className: "arc-counter"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "arc-counterLabel"
+  }, "Earned"), /*#__PURE__*/React.createElement("div", {
+    className: "arc-counterValue arc-mono"
+  }, fmt(data.rewardFund))), /*#__PURE__*/React.createElement("div", {
+    className: "arc-counter"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "arc-counterLabel"
+  }, "Funded"), /*#__PURE__*/React.createElement("div", {
+    className: "arc-counterValue arc-mono",
+    style: {
+      color: "var(--ink)"
+    }
+  }, fmt(data.fundedBalance))), /*#__PURE__*/React.createElement("button", {
+    className: "arc-btnLink",
+    onClick: handleLogOut,
+    style: {
+      color: "var(--muted)"
+    }
+  }, "Log out (", authUser.email, ")"))), /*#__PURE__*/React.createElement("div", {
+    className: "arc-panelNote",
+    style: {
+      marginTop: -18,
+      marginBottom: 20
+    }
+  }, /*#__PURE__*/React.createElement("b", {
+    style: {
+      color: "var(--ink)"
+    }
+  }, "Earned"), " is your gamified score for good budgeting behavior. ", /*#__PURE__*/React.createElement("b", {
+    style: {
+      color: "var(--ink)"
+    }
+  }, "Funded"), " is real money you've told the app you moved into an actual rewards account. Redeeming a reward needs both."), flash && /*#__PURE__*/React.createElement("div", {
+    className: "arc-flash"
+  }, flash), syncStatus === "error" && /*#__PURE__*/React.createElement("div", {
+    className: "arc-authError",
+    style: {
+      marginBottom: 16,
+      padding: "10px 14px",
+      background: "var(--warn-soft)",
+      borderRadius: 8
+    }
+  }, "⚠ ", syncError, " — your changes are only saved on this device until this is fixed."), syncStatus === "saving" && /*#__PURE__*/React.createElement("div", {
+    className: "arc-panelNote",
+    style: {
+      marginBottom: 12
+    }
+  }, "Saving to the cloud..."), /*#__PURE__*/React.createElement("div", {
+    className: "arc-grid"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "arc-panel"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "arc-panelTitle"
+  }, /*#__PURE__*/React.createElement("span", null, "Monthly take-home pay — ", monthLabel(data.currentMonth)), /*#__PURE__*/React.createElement("button", {
+    className: "arc-btnLink",
+    onClick: handleForceReset
+  }, "Archive & reset this month now")), /*#__PURE__*/React.createElement("div", {
+    className: "arc-row"
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "arc-input",
+    placeholder: "e.g. 4200",
+    type: "number",
+    min: "0",
+    step: "0.01",
+    value: payInput,
+    onChange: e => setPayInput(e.target.value),
+    style: {
+      maxWidth: 160
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "arc-btn",
+    onClick: handleSetPay
+  }, "Save")), /*#__PURE__*/React.createElement("div", {
+    className: "arc-panelNote"
+  }, M > 0 ? `Envelope budgets are calculated from this amount using Dave Ramsey's suggested percentages.` : "Set this to generate your envelope budgets."), M > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "arc-allocBar"
+  }, data.envelopes.map((e, i) => /*#__PURE__*/React.createElement("div", {
+    key: e.id,
+    className: "arc-allocSeg",
+    style: {
+      width: e.pct + "%",
+      background: segColors[i % segColors.length]
+    },
+    title: `${e.name}: ${e.pct}%`
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "arc-allocFoot"
+  }, /*#__PURE__*/React.createElement("span", null, totalPct, "% allocated (", fmt(totalBudget), "/mo)"), /*#__PURE__*/React.createElement("span", null, "+ Debt minimums: ", minPaymentPct, "% (", fmt(totalMinPayments), "/mo)"), /*#__PURE__*/React.createElement("span", null, "+ Goal contributions: ", goalMonthlyPct, "% (", fmt(totalGoalMonthly), "/mo)"), /*#__PURE__*/React.createElement("span", null, "Ramsey's saving guideline: ", RAMSEY_SAVING_PCT, "% (~", fmt(suggestedSaving), "/mo)"))), /*#__PURE__*/React.createElement("div", {
+    className: "arc-panelNote"
+  }, "Envelopes reset automatically each month — the prior month is saved to your Archive below. Goals and your Reward Fund carry over.")), /*#__PURE__*/React.createElement("div", {
+    className: "arc-panel"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "arc-panelTitle"
+  }, "Log an expense"), /*#__PURE__*/React.createElement("div", {
+    className: "arc-row"
+  }, /*#__PURE__*/React.createElement("select", {
+    className: "arc-select",
+    value: expForm.env,
+    onChange: e => setExpForm({
+      ...expForm,
+      env: e.target.value
+    })
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Category..."), data.envelopes.map(e => /*#__PURE__*/React.createElement("option", {
+    key: e.id,
+    value: e.id
+  }, e.name))), /*#__PURE__*/React.createElement("input", {
+    className: "arc-input",
+    placeholder: "Amount",
+    type: "number",
+    min: "0",
+    step: "0.01",
+    value: expForm.amount,
+    onChange: e => setExpForm({
+      ...expForm,
+      amount: e.target.value
+    }),
+    style: {
+      maxWidth: 100
+    }
+  }), /*#__PURE__*/React.createElement("input", {
+    className: "arc-input",
+    placeholder: "Vendor (optional)",
+    value: expForm.vendor,
+    onChange: e => setExpForm({
+      ...expForm,
+      vendor: e.target.value
+    })
+  }), /*#__PURE__*/React.createElement("input", {
+    className: "arc-input",
+    placeholder: "Note (optional)",
+    value: expForm.note,
+    onChange: e => setExpForm({
+      ...expForm,
+      note: e.target.value
+    })
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "arc-btn",
+    onClick: handleAddExpense
+  }, "Log")))), /*#__PURE__*/React.createElement("div", {
+    className: "arc-grid"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "arc-panel"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "arc-panelTitle"
+  }, "Log savings"), /*#__PURE__*/React.createElement("div", {
+    className: "arc-row"
+  }, /*#__PURE__*/React.createElement("select", {
+    className: "arc-select",
+    value: saveForm.goal,
+    onChange: e => setSaveForm({
+      ...saveForm,
+      goal: e.target.value
+    })
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Goal..."), data.goals.map(g => /*#__PURE__*/React.createElement("option", {
+    key: g.id,
+    value: g.id
+  }, g.name))), /*#__PURE__*/React.createElement("input", {
+    className: "arc-input",
+    placeholder: "Amount",
+    type: "number",
+    min: "0",
+    step: "0.01",
+    value: saveForm.amount,
+    onChange: e => setSaveForm({
+      ...saveForm,
+      amount: e.target.value
+    }),
+    style: {
+      maxWidth: 100
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "arc-btn",
+    onClick: handleAddSaving
+  }, "Add")), /*#__PURE__*/React.createElement("div", {
+    className: "arc-panelNote"
+  }, "Earns a 3% match into your reward fund, plus a bonus when you hit the goal.")), /*#__PURE__*/React.createElement("div", {
+    className: "arc-panel"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "arc-panelTitle"
+  }, "Log a debt payment"), /*#__PURE__*/React.createElement("div", {
+    className: "arc-row"
+  }, /*#__PURE__*/React.createElement("select", {
+    className: "arc-select",
+    value: debtForm.debt,
+    onChange: e => setDebtForm({
+      ...debtForm,
+      debt: e.target.value
+    })
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Debt..."), data.debts.map(d => /*#__PURE__*/React.createElement("option", {
+    key: d.id,
+    value: d.id
+  }, d.name))), /*#__PURE__*/React.createElement("input", {
+    className: "arc-input",
+    placeholder: "Amount",
+    type: "number",
+    min: "0",
+    step: "0.01",
+    value: debtForm.amount,
+    onChange: e => setDebtForm({
+      ...debtForm,
+      amount: e.target.value
+    }),
+    style: {
+      maxWidth: 100
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "arc-btn",
+    onClick: handleAddDebtPayment
+  }, "Pay down")), /*#__PURE__*/React.createElement("div", {
+    className: "arc-panelNote"
+  }, "Earns a 5% match into your reward fund — a richer rate than saving, since paying off debt is the higher priority. Paying a debt off in full pays an extra bonus."))), /*#__PURE__*/React.createElement("div", {
+    className: "arc-sectionTitle"
+  }, "Envelopes"), /*#__PURE__*/React.createElement("div", {
+    className: "arc-sectionSub"
+  }, "Budgets = your take-home pay × each category's percentage. Edit either the % or the $ amount — they stay in sync."), /*#__PURE__*/React.createElement("div", {
+    className: `arc-totalCalc ${round2(totalPct + minPaymentPct + goalMonthlyPct) > 100 ? "over" : ""}`
+  }, /*#__PURE__*/React.createElement("span", null, "Envelopes: ", /*#__PURE__*/React.createElement("b", null, totalPct, "%"), " (", fmt(totalBudget), "/mo)"), /*#__PURE__*/React.createElement("span", null, "Debt minimums: ", /*#__PURE__*/React.createElement("b", null, minPaymentPct, "%"), " (", fmt(totalMinPayments), "/mo)"), /*#__PURE__*/React.createElement("span", null, "Goal contributions: ", /*#__PURE__*/React.createElement("b", null, goalMonthlyPct, "%"), " (", fmt(totalGoalMonthly), "/mo)"), /*#__PURE__*/React.createElement("span", null, "Total: ", /*#__PURE__*/React.createElement("b", null, round2(totalPct + minPaymentPct + goalMonthlyPct), "%"), round2(totalPct + minPaymentPct + goalMonthlyPct) > 100 ? " — over 100% of take-home" : "")), /*#__PURE__*/React.createElement("div", {
+    className: "arc-panelNote",
+    style: {
+      marginBottom: 14,
+      marginTop: -8
+    }
+  }, "For reference, Ramsey's guideline suggests saving ", RAMSEY_SAVING_PCT, "% of take-home (~", fmt(suggestedSaving), "/mo) — your actual goal contributions above may differ."), /*#__PURE__*/React.createElement("div", {
+    className: "arc-cards"
+  }, data.envelopes.map(env => {
+    const budget = round2(M * (env.pct / 100));
+    const pct = budget > 0 ? Math.min(100, env.spent / budget * 100) : 0;
+    const over = budget > 0 && env.spent > budget;
+    return /*#__PURE__*/React.createElement("div", {
+      className: "arc-card",
+      key: env.id
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "arc-cardHead"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "arc-cardName"
+    }, env.name), /*#__PURE__*/React.createElement("span", {
+      className: `arc-cardAmt arc-mono ${over ? "over" : ""}`
+    }, fmt(env.spent), " / ", fmt(budget))), /*#__PURE__*/React.createElement("div", {
+      className: "arc-editRow"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "arc-editField"
+    }, /*#__PURE__*/React.createElement("label", null, "%"), /*#__PURE__*/React.createElement("input", {
+      className: "arc-editInput",
+      type: "number",
+      min: "0",
+      max: "100",
+      step: "0.5",
+      value: env.pct,
+      onChange: e => updateEnvPct(env.id, e.target.value)
+    })), /*#__PURE__*/React.createElement("div", {
+      className: "arc-editField"
+    }, /*#__PURE__*/React.createElement("label", null, "$ / mo"), /*#__PURE__*/React.createElement("input", {
+      className: "arc-editInput",
+      type: "number",
+      min: "0",
+      step: "1",
+      value: envBudgetDrafts[env.id] !== undefined ? envBudgetDrafts[env.id] : budget,
+      disabled: !M || M <= 0,
+      title: !M || M <= 0 ? "Set your take-home pay to edit by dollar amount" : "",
+      onChange: e => setEnvBudgetDrafts(prev => ({
+        ...prev,
+        [env.id]: e.target.value
+      })),
+      onFocus: e => setEnvBudgetDrafts(prev => ({
+        ...prev,
+        [env.id]: e.target.value
+      })),
+      onBlur: () => {
+        const draft = envBudgetDrafts[env.id];
+        if (draft !== undefined) updateEnvBudget(env.id, draft);
+        setEnvBudgetDrafts(prev => {
+          const next = {
+            ...prev
+          };
+          delete next[env.id];
+          return next;
+        });
+      },
+      onKeyDown: e => {
+        if (e.key === "Enter") e.target.blur();
+      }
+    }))), /*#__PURE__*/React.createElement("div", {
+      className: "arc-track"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: `arc-trackFill ${over ? "over" : ""}`,
+      style: {
+        width: pct + "%"
+      }
+    })), /*#__PURE__*/React.createElement("div", {
+      className: "arc-cardActions"
+    }, /*#__PURE__*/React.createElement("button", {
+      className: "arc-btnLink",
+      onClick: () => deleteEnvelope(env.id),
+      style: {
+        color: "var(--warn)"
+      }
+    }, "Delete")));
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "arc-card",
+    style: {
+      display: "flex",
+      alignItems: "center"
+    }
+  }, showNewEnv ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: "100%"
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "arc-input",
+    placeholder: "Name",
+    value: newEnv.name,
+    onChange: e => setNewEnv({
+      ...newEnv,
+      name: e.target.value
+    }),
+    style: {
+      marginBottom: 8,
+      width: "100%"
+    }
+  }), /*#__PURE__*/React.createElement("input", {
+    className: "arc-input",
+    placeholder: "% of take-home",
+    type: "number",
+    value: newEnv.pct,
+    onChange: e => setNewEnv({
+      ...newEnv,
+      pct: e.target.value
+    }),
+    style: {
+      marginBottom: 8,
+      width: "100%"
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "arc-btn",
+    onClick: addEnvelope,
+    style: {
+      width: "100%"
+    }
+  }, "Add envelope")) : /*#__PURE__*/React.createElement("button", {
+    className: "arc-btnGhost",
+    onClick: () => setShowNewEnv(true)
+  }, "+ New envelope"))), /*#__PURE__*/React.createElement("div", {
+    className: "arc-sectionTitle"
+  }, "Goals"), /*#__PURE__*/React.createElement("div", {
+    className: "arc-sectionSub"
+  }, "Set a monthly contribution target per goal — it's added into the total percentage above."), /*#__PURE__*/React.createElement("div", {
+    className: "arc-cards",
+    style: {
+      gridTemplateColumns: "1fr"
+    }
+  }, data.goals.map(goal => {
+    const pct = Math.min(100, goal.saved / goal.target * 100);
+    if (editingGoalId === goal.id) {
+      return /*#__PURE__*/React.createElement("div", {
+        className: "arc-card",
+        key: goal.id
+      }, /*#__PURE__*/React.createElement("div", {
+        className: "arc-cardEditRow"
+      }, /*#__PURE__*/React.createElement("input", {
+        className: "arc-input",
+        placeholder: "Goal name",
+        value: editGoalDraft.name,
+        onChange: e => setEditGoalDraft({
+          ...editGoalDraft,
+          name: e.target.value
+        })
+      })), /*#__PURE__*/React.createElement("div", {
+        className: "arc-cardEditRow"
+      }, /*#__PURE__*/React.createElement("input", {
+        className: "arc-input",
+        placeholder: "Saved so far",
+        type: "number",
+        value: editGoalDraft.saved,
+        onChange: e => setEditGoalDraft({
+          ...editGoalDraft,
+          saved: e.target.value
+        })
+      }), /*#__PURE__*/React.createElement("input", {
+        className: "arc-input",
+        placeholder: "Target amount",
+        type: "number",
+        value: editGoalDraft.target,
+        onChange: e => setEditGoalDraft({
+          ...editGoalDraft,
+          target: e.target.value
+        })
+      })), /*#__PURE__*/React.createElement("div", {
+        className: "arc-cardEditRow"
+      }, /*#__PURE__*/React.createElement("input", {
+        className: "arc-input",
+        placeholder: "Monthly contribution goal ($)",
+        type: "number",
+        value: editGoalDraft.monthlyTarget,
+        onChange: e => setEditGoalDraft({
+          ...editGoalDraft,
+          monthlyTarget: e.target.value
+        })
+      })), /*#__PURE__*/React.createElement("div", {
+        className: "arc-cardActions"
+      }, /*#__PURE__*/React.createElement("button", {
+        className: "arc-btnLink",
+        onClick: saveEditGoal
+      }, "Save"), /*#__PURE__*/React.createElement("button", {
+        className: "arc-btnLink",
+        onClick: cancelEditGoal,
+        style: {
+          color: "var(--muted)"
+        }
+      }, "Cancel"), /*#__PURE__*/React.createElement("button", {
+        className: "arc-btnLink",
+        onClick: () => deleteGoal(goal.id),
+        style: {
+          color: "var(--warn)"
+        }
+      }, "Delete")));
+    }
+    return /*#__PURE__*/React.createElement("div", {
+      className: "arc-card",
+      key: goal.id
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "arc-cardHead"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "arc-cardName"
+    }, goal.completed ? "✓ " : "", goal.name), /*#__PURE__*/React.createElement("span", {
+      className: "arc-cardAmt arc-mono"
+    }, fmt(goal.saved), " / ", fmt(goal.target))), !goal.completed && (goal.monthlyTarget || 0) > 0 && /*#__PURE__*/React.createElement("div", {
+      className: "arc-panelNote",
+      style: {
+        marginTop: 0,
+        marginBottom: 8
+      }
+    }, "Monthly goal: ", fmt(goal.monthlyTarget), "/mo"), /*#__PURE__*/React.createElement("div", {
+      className: "arc-quest"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "arc-questTrack"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "arc-questFill",
+      style: {
+        width: pct + "%"
+      }
+    })), /*#__PURE__*/React.createElement("div", {
+      className: "arc-questMarks"
+    }, [25, 50, 75, 100].map(m => /*#__PURE__*/React.createElement("span", {
+      key: m,
+      className: `arc-questMark ${pct >= m ? "done" : ""}`
+    }, m, "%")))), /*#__PURE__*/React.createElement("div", {
+      className: "arc-cardActions"
+    }, /*#__PURE__*/React.createElement("button", {
+      className: "arc-btnLink",
+      onClick: () => startEditGoal(goal)
+    }, "Edit"), /*#__PURE__*/React.createElement("button", {
+      className: "arc-btnLink",
+      onClick: () => deleteGoal(goal.id),
+      style: {
+        color: "var(--warn)"
+      }
+    }, "Delete")));
+  }), showNewGoal ? /*#__PURE__*/React.createElement("div", {
+    className: "arc-card"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "arc-newForm"
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "arc-input",
+    placeholder: "Goal name",
+    value: newGoal.name,
+    onChange: e => setNewGoal({
+      ...newGoal,
+      name: e.target.value
+    })
+  }), /*#__PURE__*/React.createElement("input", {
+    className: "arc-input",
+    placeholder: "Target amount",
+    type: "number",
+    value: newGoal.target,
+    onChange: e => setNewGoal({
+      ...newGoal,
+      target: e.target.value
+    }),
+    style: {
+      maxWidth: 140
+    }
+  }), /*#__PURE__*/React.createElement("input", {
+    className: "arc-input",
+    placeholder: "Monthly goal $ (optional)",
+    type: "number",
+    value: newGoal.monthlyTarget,
+    onChange: e => setNewGoal({
+      ...newGoal,
+      monthlyTarget: e.target.value
+    }),
+    style: {
+      maxWidth: 160
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "arc-btn",
+    onClick: addGoal
+  }, "Add goal"))) : /*#__PURE__*/React.createElement("button", {
+    className: "arc-btnGhost",
+    onClick: () => setShowNewGoal(true)
+  }, "+ New goal")), /*#__PURE__*/React.createElement("div", {
+    className: "arc-sectionTitle"
+  }, "Debt Payoff"), /*#__PURE__*/React.createElement("div", {
+    className: "arc-cards",
+    style: {
+      gridTemplateColumns: "1fr"
+    }
+  }, data.debts.map(debt => {
+    const paidPct = Math.min(100, (debt.originalBalance - debt.balance) / debt.originalBalance * 100);
+    if (editingDebtId === debt.id) {
+      return /*#__PURE__*/React.createElement("div", {
+        className: "arc-card",
+        key: debt.id
+      }, /*#__PURE__*/React.createElement("div", {
+        className: "arc-cardEditRow"
+      }, /*#__PURE__*/React.createElement("input", {
+        className: "arc-input",
+        placeholder: "Debt name",
+        value: editDebtDraft.name,
+        onChange: e => setEditDebtDraft({
+          ...editDebtDraft,
+          name: e.target.value
+        })
+      })), /*#__PURE__*/React.createElement("div", {
+        className: "arc-cardEditRow"
+      }, /*#__PURE__*/React.createElement("input", {
+        className: "arc-input",
+        placeholder: "Current balance",
+        type: "number",
+        value: editDebtDraft.balance,
+        onChange: e => setEditDebtDraft({
+          ...editDebtDraft,
+          balance: e.target.value
+        })
+      }), /*#__PURE__*/React.createElement("input", {
+        className: "arc-input",
+        placeholder: "Original balance",
+        type: "number",
+        value: editDebtDraft.originalBalance,
+        onChange: e => setEditDebtDraft({
+          ...editDebtDraft,
+          originalBalance: e.target.value
+        })
+      })), /*#__PURE__*/React.createElement("div", {
+        className: "arc-cardEditRow"
+      }, /*#__PURE__*/React.createElement("input", {
+        className: "arc-input",
+        placeholder: "Minimum payment / mo",
+        type: "number",
+        value: editDebtDraft.minPayment,
+        onChange: e => setEditDebtDraft({
+          ...editDebtDraft,
+          minPayment: e.target.value
+        })
+      }), /*#__PURE__*/React.createElement("input", {
+        className: "arc-input",
+        placeholder: "Due day (1-31, optional)",
+        type: "number",
+        min: "1",
+        max: "31",
+        value: editDebtDraft.dueDay,
+        onChange: e => setEditDebtDraft({
+          ...editDebtDraft,
+          dueDay: e.target.value
+        })
+      })), /*#__PURE__*/React.createElement("div", {
+        className: "arc-cardActions"
+      }, /*#__PURE__*/React.createElement("button", {
+        className: "arc-btnLink",
+        onClick: saveEditDebt
+      }, "Save"), /*#__PURE__*/React.createElement("button", {
+        className: "arc-btnLink",
+        onClick: cancelEditDebt,
+        style: {
+          color: "var(--muted)"
+        }
+      }, "Cancel"), /*#__PURE__*/React.createElement("button", {
+        className: "arc-btnLink",
+        onClick: () => deleteDebt(debt.id),
+        style: {
+          color: "var(--warn)"
+        }
+      }, "Delete")));
+    }
+    return /*#__PURE__*/React.createElement("div", {
+      className: "arc-card",
+      key: debt.id
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "arc-cardHead"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "arc-cardName"
+    }, debt.paidOff ? "✓ " : "", debt.name), /*#__PURE__*/React.createElement("span", {
+      className: "arc-cardAmt arc-mono"
+    }, fmt(debt.balance), " left of ", fmt(debt.originalBalance))), !debt.paidOff && (debt.minPayment || 0) > 0 && /*#__PURE__*/React.createElement("div", {
+      className: "arc-panelNote",
+      style: {
+        marginTop: 0,
+        marginBottom: 8
+      }
+    }, "Minimum payment: ", fmt(debt.minPayment), "/mo", debt.dueDay ? ` · due the ${ordinal(debt.dueDay)}` : ""), /*#__PURE__*/React.createElement("div", {
+      className: "arc-quest"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "arc-questTrack"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "arc-questFill",
+      style: {
+        width: paidPct + "%"
+      }
+    })), /*#__PURE__*/React.createElement("div", {
+      className: "arc-questMarks"
+    }, [25, 50, 75, 100].map(m => /*#__PURE__*/React.createElement("span", {
+      key: m,
+      className: `arc-questMark ${paidPct >= m ? "done" : ""}`
+    }, m, "%")))), /*#__PURE__*/React.createElement("div", {
+      className: "arc-cardActions"
+    }, /*#__PURE__*/React.createElement("button", {
+      className: "arc-btnLink",
+      onClick: () => startEditDebt(debt)
+    }, "Edit"), /*#__PURE__*/React.createElement("button", {
+      className: "arc-btnLink",
+      onClick: () => deleteDebt(debt.id),
+      style: {
+        color: "var(--warn)"
+      }
+    }, "Delete")));
+  }), data.debts.length === 0 && !showNewDebt && /*#__PURE__*/React.createElement("div", {
+    className: "arc-empty"
+  }, "No debts added yet."), showNewDebt ? /*#__PURE__*/React.createElement("div", {
+    className: "arc-card"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "arc-newForm"
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "arc-input",
+    placeholder: "Debt name (e.g. Credit Card)",
+    value: newDebt.name,
+    onChange: e => setNewDebt({
+      ...newDebt,
+      name: e.target.value
+    })
+  }), /*#__PURE__*/React.createElement("input", {
+    className: "arc-input",
+    placeholder: "Current balance",
+    type: "number",
+    value: newDebt.balance,
+    onChange: e => setNewDebt({
+      ...newDebt,
+      balance: e.target.value
+    }),
+    style: {
+      maxWidth: 140
+    }
+  }), /*#__PURE__*/React.createElement("input", {
+    className: "arc-input",
+    placeholder: "Min. payment / mo (optional)",
+    type: "number",
+    value: newDebt.minPayment,
+    onChange: e => setNewDebt({
+      ...newDebt,
+      minPayment: e.target.value
+    }),
+    style: {
+      maxWidth: 160
+    }
+  }), /*#__PURE__*/React.createElement("input", {
+    className: "arc-input",
+    placeholder: "Due day 1-31 (optional)",
+    type: "number",
+    min: "1",
+    max: "31",
+    value: newDebt.dueDay,
+    onChange: e => setNewDebt({
+      ...newDebt,
+      dueDay: e.target.value
+    }),
+    style: {
+      maxWidth: 160
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "arc-btn",
+    onClick: addDebt
+  }, "Add debt"))) : /*#__PURE__*/React.createElement("button", {
+    className: "arc-btnGhost",
+    onClick: () => setShowNewDebt(true)
+  }, "+ New debt")), /*#__PURE__*/React.createElement("div", {
+    className: "arc-sectionTitle"
+  }, "Pay Period Planner"), /*#__PURE__*/React.createElement("div", {
+    className: "arc-sectionSub"
+  }, "Add your bills and upcoming paychecks — the plan below funds them in priority order: bills by due date, then debt minimums, then goal contributions."), /*#__PURE__*/React.createElement("div", {
+    className: "arc-grid"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "arc-panel"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "arc-panelTitle"
+  }, "Bills"), /*#__PURE__*/React.createElement("div", {
+    className: "arc-cards",
+    style: {
+      gridTemplateColumns: "1fr",
+      gap: 8
+    }
+  }, data.bills.map(bill => {
+    if (editingBillId === bill.id) {
+      return /*#__PURE__*/React.createElement("div", {
+        className: "arc-card",
+        key: bill.id
+      }, /*#__PURE__*/React.createElement("div", {
+        className: "arc-cardEditRow"
+      }, /*#__PURE__*/React.createElement("input", {
+        className: "arc-input",
+        placeholder: "Bill name",
+        value: editBillDraft.name,
+        onChange: e => setEditBillDraft({
+          ...editBillDraft,
+          name: e.target.value
+        })
+      })), /*#__PURE__*/React.createElement("div", {
+        className: "arc-cardEditRow"
+      }, /*#__PURE__*/React.createElement("input", {
+        className: "arc-input",
+        placeholder: "Amount",
+        type: "number",
+        value: editBillDraft.amount,
+        onChange: e => setEditBillDraft({
+          ...editBillDraft,
+          amount: e.target.value
+        })
+      }), /*#__PURE__*/React.createElement("input", {
+        className: "arc-input",
+        placeholder: "Due day (1-31)",
+        type: "number",
+        min: "1",
+        max: "31",
+        value: editBillDraft.dueDay,
+        onChange: e => setEditBillDraft({
+          ...editBillDraft,
+          dueDay: e.target.value
+        })
+      })), /*#__PURE__*/React.createElement("div", {
+        className: "arc-cardActions"
+      }, /*#__PURE__*/React.createElement("button", {
+        className: "arc-btnLink",
+        onClick: saveEditBill
+      }, "Save"), /*#__PURE__*/React.createElement("button", {
+        className: "arc-btnLink",
+        onClick: cancelEditBill,
+        style: {
+          color: "var(--muted)"
+        }
+      }, "Cancel"), /*#__PURE__*/React.createElement("button", {
+        className: "arc-btnLink",
+        onClick: () => deleteBill(bill.id),
+        style: {
+          color: "var(--warn)"
+        }
+      }, "Delete")));
+    }
+    return /*#__PURE__*/React.createElement("div", {
+      className: "arc-card",
+      key: bill.id
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "arc-cardHead"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "arc-cardName"
+    }, bill.name), /*#__PURE__*/React.createElement("span", {
+      className: "arc-cardAmt arc-mono"
+    }, fmt(bill.amount), " · due the ", ordinal(bill.dueDay))), /*#__PURE__*/React.createElement("div", {
+      className: "arc-cardActions"
+    }, /*#__PURE__*/React.createElement("button", {
+      className: "arc-btnLink",
+      onClick: () => startEditBill(bill)
+    }, "Edit"), /*#__PURE__*/React.createElement("button", {
+      className: "arc-btnLink",
+      onClick: () => deleteBill(bill.id),
+      style: {
+        color: "var(--warn)"
+      }
+    }, "Delete")));
+  }), data.bills.length === 0 && !showNewBill && /*#__PURE__*/React.createElement("div", {
+    className: "arc-empty"
+  }, "No bills added yet."), showNewBill ? /*#__PURE__*/React.createElement("div", {
+    className: "arc-card"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "arc-newForm"
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "arc-input",
+    placeholder: "Bill name (e.g. Rent)",
+    value: newBill.name,
+    onChange: e => setNewBill({
+      ...newBill,
+      name: e.target.value
+    })
+  }), /*#__PURE__*/React.createElement("input", {
+    className: "arc-input",
+    placeholder: "Amount",
+    type: "number",
+    value: newBill.amount,
+    onChange: e => setNewBill({
+      ...newBill,
+      amount: e.target.value
+    }),
+    style: {
+      maxWidth: 120
+    }
+  }), /*#__PURE__*/React.createElement("input", {
+    className: "arc-input",
+    placeholder: "Due day (1-31)",
+    type: "number",
+    min: "1",
+    max: "31",
+    value: newBill.dueDay,
+    onChange: e => setNewBill({
+      ...newBill,
+      dueDay: e.target.value
+    }),
+    style: {
+      maxWidth: 130
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "arc-btn",
+    onClick: addBill
+  }, "Add bill"))) : /*#__PURE__*/React.createElement("button", {
+    className: "arc-btnGhost",
+    onClick: () => setShowNewBill(true)
+  }, "+ New bill"))), /*#__PURE__*/React.createElement("div", {
+    className: "arc-panel"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "arc-panelTitle"
+  }, "Upcoming Paychecks"), /*#__PURE__*/React.createElement("div", {
+    className: "arc-cards",
+    style: {
+      gridTemplateColumns: "1fr",
+      gap: 8
+    }
+  }, data.paychecks.slice().sort((a, b) => new Date(a.date) - new Date(b.date)).map(p => {
+    if (editingPaycheckId === p.id) {
+      return /*#__PURE__*/React.createElement("div", {
+        className: "arc-card",
+        key: p.id
+      }, /*#__PURE__*/React.createElement("div", {
+        className: "arc-cardEditRow"
+      }, /*#__PURE__*/React.createElement("input", {
+        className: "arc-input",
+        placeholder: "Amount",
+        type: "number",
+        value: editPaycheckDraft.amount,
+        onChange: e => setEditPaycheckDraft({
+          ...editPaycheckDraft,
+          amount: e.target.value
+        })
+      }), /*#__PURE__*/React.createElement("input", {
+        className: "arc-input",
+        type: "date",
+        value: editPaycheckDraft.date,
+        onChange: e => setEditPaycheckDraft({
+          ...editPaycheckDraft,
+          date: e.target.value
+        })
+      })), /*#__PURE__*/React.createElement("div", {
+        className: "arc-cardActions"
+      }, /*#__PURE__*/React.createElement("button", {
+        className: "arc-btnLink",
+        onClick: saveEditPaycheck
+      }, "Save"), /*#__PURE__*/React.createElement("button", {
+        className: "arc-btnLink",
+        onClick: cancelEditPaycheck,
+        style: {
+          color: "var(--muted)"
+        }
+      }, "Cancel"), /*#__PURE__*/React.createElement("button", {
+        className: "arc-btnLink",
+        onClick: () => deletePaycheck(p.id),
+        style: {
+          color: "var(--warn)"
+        }
+      }, "Delete")));
+    }
+    return /*#__PURE__*/React.createElement("div", {
+      className: "arc-card",
+      key: p.id
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "arc-cardHead"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "arc-cardName"
+    }, fmtDate(p.date)), /*#__PURE__*/React.createElement("span", {
+      className: "arc-cardAmt arc-mono"
+    }, fmt(p.amount))), /*#__PURE__*/React.createElement("div", {
+      className: "arc-cardActions"
+    }, /*#__PURE__*/React.createElement("button", {
+      className: "arc-btnLink",
+      onClick: () => startEditPaycheck(p)
+    }, "Edit"), /*#__PURE__*/React.createElement("button", {
+      className: "arc-btnLink",
+      onClick: () => deletePaycheck(p.id),
+      style: {
+        color: "var(--warn)"
+      }
+    }, "Delete")));
+  }), data.paychecks.length === 0 && !showNewPaycheck && /*#__PURE__*/React.createElement("div", {
+    className: "arc-empty"
+  }, "No upcoming paychecks added yet."), showNewPaycheck ? /*#__PURE__*/React.createElement("div", {
+    className: "arc-card"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "arc-newForm"
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "arc-input",
+    placeholder: "Amount",
+    type: "number",
+    value: newPaycheck.amount,
+    onChange: e => setNewPaycheck({
+      ...newPaycheck,
+      amount: e.target.value
+    }),
+    style: {
+      maxWidth: 120
+    }
+  }), /*#__PURE__*/React.createElement("input", {
+    className: "arc-input",
+    type: "date",
+    value: newPaycheck.date,
+    onChange: e => setNewPaycheck({
+      ...newPaycheck,
+      date: e.target.value
+    }),
+    style: {
+      maxWidth: 160
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "arc-btn",
+    onClick: addPaycheck
+  }, "Add paycheck"))) : /*#__PURE__*/React.createElement("button", {
+    className: "arc-btnGhost",
+    onClick: () => setShowNewPaycheck(true)
+  }, "+ New paycheck")))), /*#__PURE__*/React.createElement("div", {
+    className: "arc-sectionTitle",
+    style: {
+      marginTop: 24
+    }
+  }, /*#__PURE__*/React.createElement("span", null, "Your Plan"), data.planOrder && data.planOrder.length > 0 && /*#__PURE__*/React.createElement("button", {
+    className: "arc-btnLink",
+    onClick: handleResetPlanOrder,
+    style: {
+      color: "var(--muted)"
+    }
+  }, "Reset to automatic order")), /*#__PURE__*/React.createElement("div", {
+    className: "arc-sectionSub",
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      flexWrap: "wrap",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("span", null, "Drag any line to rearrange or reallocate — it updates the order for every paycheck."), /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
+      fontSize: 12.5,
+      color: "var(--ink)",
+      cursor: "pointer",
+      whiteSpace: "nowrap"
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: data.payYourselfFirst,
+    onChange: handleTogglePayYourselfFirst
+  }), "Pay myself first")), plan.results.length === 0 && /*#__PURE__*/React.createElement("div", {
+    className: "arc-empty"
+  }, "Add at least one upcoming paycheck to see your plan."), plan.results.map(({
+    paycheck,
+    allocations,
+    leftover
+  }, i) => /*#__PURE__*/React.createElement("div", {
+    className: "arc-archiveItem",
+    key: paycheck.id
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "arc-cardHead",
+    style: {
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "arc-archiveMonth"
+  }, "Paycheck — ", fmtDate(paycheck.date)), /*#__PURE__*/React.createElement("span", {
+    className: "arc-cardAmt arc-mono"
+  }, fmt(paycheck.amount))), allocations.length === 0 && /*#__PURE__*/React.createElement("div", {
+    className: "arc-empty"
+  }, "Nothing to allocate — fully discretionary."), allocations.map(a => {
+    const draftKey = `${a.paycheckId}::${a.key}`;
+    return /*#__PURE__*/React.createElement("div", {
+      key: a.key,
+      className: `arc-dragRow ${draggedKey === a.key ? "dragging" : ""}`,
+      style: {
+        marginBottom: 6,
+        flexWrap: "wrap"
+      },
+      draggable: true,
+      onDragStart: () => setDraggedKey(a.key),
+      onDragEnd: () => setDraggedKey(null),
+      onDragOver: e => e.preventDefault(),
+      onDrop: () => {
+        handleReorderPlan(draggedKey, a.key);
+        setDraggedKey(null);
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "arc-dragHandle"
+    }, "⋮⋮"), /*#__PURE__*/React.createElement("span", null, a.type === "bill" ? "🧾" : a.type === "debt" ? "💳" : "🎯"), /*#__PURE__*/React.createElement("span", {
+      className: "arc-dragName"
+    }, a.name, a.dueDate ? ` — due ${fmtDate(a.dueDate)}` : "", !a.fullyFunded ? " (partial)" : "", a.overridden ? " (edited)" : "", a.atRisk ? " ⚠ paycheck arrives after due date" : ""), /*#__PURE__*/React.createElement("input", {
+      className: "arc-editInput",
+      style: {
+        width: 90,
+        flex: "0 0 auto"
+      },
+      type: "number",
+      min: "0",
+      step: "0.01",
+      value: allocDrafts[draftKey] !== undefined ? allocDrafts[draftKey] : a.amountApplied,
+      onFocus: e => setAllocDrafts(prev => ({
+        ...prev,
+        [draftKey]: e.target.value
+      })),
+      onChange: e => setAllocDrafts(prev => ({
+        ...prev,
+        [draftKey]: e.target.value
+      })),
+      onBlur: () => {
+        const draft = allocDrafts[draftKey];
+        if (draft !== undefined) handleSetAllocationOverride(a.paycheckId, a.key, draft);
+        setAllocDrafts(prev => {
+          const next = {
+            ...prev
+          };
+          delete next[draftKey];
+          return next;
+        });
+      },
+      onKeyDown: e => {
+        if (e.key === "Enter") e.target.blur();
+      }
+    }), /*#__PURE__*/React.createElement("button", {
+      className: "arc-btnLink",
+      onClick: () => handleRemoveAllocation(a.paycheckId, a.key),
+      style: {
+        color: "var(--warn)"
+      }
+    }, "Remove"), a.overridden && /*#__PURE__*/React.createElement("button", {
+      className: "arc-btnLink",
+      onClick: () => handleResetAllocationOverride(a.paycheckId, a.key),
+      style: {
+        color: "var(--muted)"
+      }
+    }, "Auto"));
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "arc-ticket",
+    style: {
+      borderBottom: "none",
+      fontWeight: 700
+    }
+  }, /*#__PURE__*/React.createElement("span", null, leftover >= 0 ? "Leftover, unallocated" : "Shortfall"), /*#__PURE__*/React.createElement("span", {
+    className: `arc-ticketPts arc-mono ${leftover < 0 ? "neg" : ""}`
+  }, fmt(leftover))))), plan.unfunded.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "arc-archiveItem",
+    style: {
+      borderColor: "var(--warn)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "arc-archiveMonth",
+    style: {
+      color: "var(--warn)",
+      marginBottom: 8
+    }
+  }, "⚠ Not covered by your entered paychecks"), plan.unfunded.map((item, i) => /*#__PURE__*/React.createElement("div", {
+    className: "arc-ticket",
+    key: i
+  }, /*#__PURE__*/React.createElement("span", null, item.type === "bill" ? "🧾" : item.type === "debt" ? "💳" : "🎯", " ", item.name, item.dueDate ? ` — due ${fmtDate(item.dueDate)}` : ""), /*#__PURE__*/React.createElement("span", {
+    className: "arc-ticketPts arc-mono neg"
+  }, fmt(item.remaining), " short")))), /*#__PURE__*/React.createElement("div", {
+    className: "arc-grid",
+    style: {
+      marginTop: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "arc-sectionTitle",
+    style: {
+      marginTop: 32
+    }
+  }, "Rewards"), /*#__PURE__*/React.createElement("div", {
+    className: "arc-sectionSub"
+  }, "Real dollar treats. Redeeming needs an equal amount both earned and funded."), /*#__PURE__*/React.createElement("div", {
+    className: "arc-panel",
+    style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "arc-panelTitle"
+  }, "Move money into your rewards account"), /*#__PURE__*/React.createElement("div", {
+    className: "arc-row"
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "arc-input",
+    placeholder: "Amount you actually transferred",
+    type: "number",
+    min: "0",
+    step: "0.01",
+    value: fundInput,
+    onChange: e => setFundInput(e.target.value),
+    style: {
+      maxWidth: 200
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "arc-btn",
+    onClick: handleFundRewards
+  }, "I moved this")), /*#__PURE__*/React.createElement("div", {
+    className: "arc-panelNote"
+  }, "Log it here only after you've actually moved that amount into a real savings account, envelope, or cash stash set aside for treats — this doesn't move any real money itself.")), /*#__PURE__*/React.createElement("div", {
+    className: "arc-rewards"
+  }, data.rewards.map(r => {
+    const hasEarned = data.rewardFund >= r.amount;
+    const hasFunded = data.fundedBalance >= r.amount;
+    const canRedeem = hasEarned && hasFunded;
+    let label = "Redeem";
+    if (!hasEarned && !hasFunded) label = "Not earned or funded";else if (!hasEarned) label = "Not earned yet";else if (!hasFunded) label = "Not funded yet";
+    return /*#__PURE__*/React.createElement("div", {
+      className: "arc-reward",
+      key: r.id
+    }, editingRewardId === r.id ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      className: "arc-rewardEditRow"
+    }, /*#__PURE__*/React.createElement("input", {
+      className: "arc-input",
+      placeholder: "Name",
+      value: editRewardDraft.name,
+      onChange: e => setEditRewardDraft({
+        ...editRewardDraft,
+        name: e.target.value
+      })
+    })), /*#__PURE__*/React.createElement("div", {
+      className: "arc-rewardEditRow"
+    }, /*#__PURE__*/React.createElement("input", {
+      className: "arc-input",
+      placeholder: "Amount",
+      type: "number",
+      max: "500",
+      value: editRewardDraft.amount,
+      onChange: e => setEditRewardDraft({
+        ...editRewardDraft,
+        amount: e.target.value
+      })
+    })), /*#__PURE__*/React.createElement("div", {
+      className: "arc-rewardActions"
+    }, /*#__PURE__*/React.createElement("button", {
+      className: "arc-btnLink",
+      onClick: saveEditReward
+    }, "Save"), /*#__PURE__*/React.createElement("button", {
+      className: "arc-btnLink",
+      onClick: cancelEditReward,
+      style: {
+        color: "var(--muted)"
+      }
+    }, "Cancel"))) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      className: "arc-rewardAmt arc-mono"
+    }, fmt(r.amount)), /*#__PURE__*/React.createElement("div", {
+      className: "arc-rewardName"
+    }, r.name), /*#__PURE__*/React.createElement("button", {
+      className: "arc-btn arc-btnSmall",
+      disabled: !canRedeem,
+      onClick: () => handleRedeem(r),
+      style: {
+        width: "100%"
+      }
+    }, label), /*#__PURE__*/React.createElement("div", {
+      className: "arc-rewardActions"
+    }, /*#__PURE__*/React.createElement("button", {
+      className: "arc-btnLink",
+      onClick: () => startEditReward(r)
+    }, "Edit"), /*#__PURE__*/React.createElement("button", {
+      className: "arc-btnLink",
+      onClick: () => deleteReward(r.id),
+      style: {
+        color: "var(--warn)"
+      }
+    }, "Delete"))));
+  })), showNewReward ? /*#__PURE__*/React.createElement("div", {
+    className: "arc-newForm"
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "arc-input",
+    placeholder: "Reward name",
+    value: newReward.name,
+    onChange: e => setNewReward({
+      ...newReward,
+      name: e.target.value
+    }),
+    onKeyDown: e => e.key === "Enter" && addReward()
+  }), /*#__PURE__*/React.createElement("input", {
+    className: "arc-input",
+    placeholder: "Amount ($, up to 500)",
+    type: "number",
+    max: "500",
+    value: newReward.amount,
+    onChange: e => setNewReward({
+      ...newReward,
+      amount: e.target.value
+    }),
+    onKeyDown: e => e.key === "Enter" && addReward(),
+    style: {
+      maxWidth: 150
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "arc-btn",
+    onClick: addReward
+  }, "Add")) : /*#__PURE__*/React.createElement("button", {
+    className: "arc-btnGhost",
+    onClick: () => setShowNewReward(true),
+    style: {
+      marginTop: 10
+    }
+  }, "+ New reward")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "arc-sectionTitle",
+    style: {
+      marginTop: 32
+    }
+  }, "Activity — ", monthLabel(data.currentMonth)), /*#__PURE__*/React.createElement("div", {
+    className: "arc-sectionSub"
+  }, "\xA0"), /*#__PURE__*/React.createElement("div", {
+    className: "arc-tickets"
+  }, data.transactions.length === 0 && /*#__PURE__*/React.createElement("div", {
+    className: "arc-empty"
+  }, "No activity yet this month."), data.transactions.slice(0, 40).map(t => /*#__PURE__*/React.createElement("div", {
+    className: "arc-ticket",
+    key: t.id
+  }, /*#__PURE__*/React.createElement("span", null, t.text), /*#__PURE__*/React.createElement("span", {
+    className: `arc-ticketPts arc-mono ${t.pts < 0 ? "neg" : ""}`
+  }, t.pts >= 0 ? "+" : "", fmt(t.pts))))))), /*#__PURE__*/React.createElement("div", {
+    className: "arc-sectionTitle"
+  }, "Archive"), /*#__PURE__*/React.createElement("div", {
+    className: "arc-sectionSub"
+  }, "Past months' envelope spending and activity, kept for your records."), (!data.archive || data.archive.length === 0) && /*#__PURE__*/React.createElement("div", {
+    className: "arc-empty"
+  }, "No archived months yet — your current month archives automatically once a new month begins."), data.archive && data.archive.map(a => {
+    const totalSpent = a.envelopes.reduce((s, e) => s + e.spent, 0);
+    const totalBudgetA = a.envelopes.reduce((s, e) => s + e.budget, 0);
+    const isOpen = expandedMonth === a.month;
+    return /*#__PURE__*/React.createElement("div", {
+      className: "arc-archiveItem",
+      key: a.month
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "arc-archiveHead",
+      onClick: () => setExpandedMonth(isOpen ? null : a.month)
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "arc-archiveMonth"
+    }, monthLabel(a.month)), /*#__PURE__*/React.createElement("span", {
+      className: "arc-archiveSummary"
+    }, fmt(totalSpent), " spent of ", fmt(totalBudgetA), " budgeted · ", isOpen ? "hide" : "view")), isOpen && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("table", {
+      className: "arc-archiveTable"
+    }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Envelope"), /*#__PURE__*/React.createElement("th", null, "%"), /*#__PURE__*/React.createElement("th", null, "Budget"), /*#__PURE__*/React.createElement("th", null, "Spent"))), /*#__PURE__*/React.createElement("tbody", null, a.envelopes.map(e => /*#__PURE__*/React.createElement("tr", {
+      key: e.name
+    }, /*#__PURE__*/React.createElement("td", null, e.name), /*#__PURE__*/React.createElement("td", null, e.pct, "%"), /*#__PURE__*/React.createElement("td", null, fmt(e.budget)), /*#__PURE__*/React.createElement("td", {
+      className: e.spent > e.budget ? "over" : ""
+    }, fmt(e.spent)))))), /*#__PURE__*/React.createElement("div", {
+      className: "arc-tickets",
+      style: {
+        marginTop: 12
+      }
+    }, a.transactions.length === 0 && /*#__PURE__*/React.createElement("div", {
+      className: "arc-empty"
+    }, "No activity logged that month."), a.transactions.map(t => /*#__PURE__*/React.createElement("div", {
+      className: "arc-ticket",
+      key: t.id
+    }, /*#__PURE__*/React.createElement("span", null, t.text), /*#__PURE__*/React.createElement("span", {
+      className: `arc-ticketPts arc-mono ${t.pts < 0 ? "neg" : ""}`
+    }, t.pts >= 0 ? "+" : "", fmt(t.pts)))))));
+  }));
+}
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(React.createElement(SavingsArcade));
+</script>
+</body>
+</html>
