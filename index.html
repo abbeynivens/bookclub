@@ -73,6 +73,9 @@ const STYLE = `
   line-height: 1.5;
 }
 .arc-root * { box-sizing: border-box; }
+.arc-root svg, .arc-root svg * { outline: none !important; box-shadow: none !important; border: none !important; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+.arc-root svg:focus, .arc-root svg *:focus, .arc-root svg:focus-visible, .arc-root svg *:focus-visible { outline: none !important; box-shadow: none !important; }
+.arc-root circle, .arc-root text { outline: none !important; }
 .arc-mono { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
 
 .arc-nav {
@@ -200,6 +203,36 @@ const STYLE = `
 .arc-totalCalc.over { background: var(--warn-soft); }
 .arc-totalCalc b { font-weight: 700; }
 .arc-totalCalc.over b { color: var(--warn); }
+
+.arc-snapshot { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+.arc-snapshotHead { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+.arc-snapshotTitle { font-size: 13px; font-weight: 700; }
+.arc-snapshotStatus { font-size: 12px; font-weight: 600; }
+.arc-snapshotStatus.ok { color: var(--accent); }
+.arc-snapshotStatus.warn { color: var(--warn); }
+.arc-snapshotGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 16px; margin-top: 14px; }
+.arc-snapStat { }
+.arc-snapStat label { display: block; font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+.arc-snapValue { font-size: 18px; font-weight: 700; }
+.arc-snapValue.warn { color: var(--warn); }
+.arc-snapSub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+.arc-snapStat.ring { display: flex; flex-direction: column; align-items: center; text-align: center; }
+.arc-snapStat.ring label { margin-bottom: 8px; }
+.arc-snapRingVal { font-size: 13px; font-weight: 700; margin-top: 8px; }
+.arc-snapRingVal.warn { color: var(--warn); }
+
+.arc-snapBars { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.arc-snapBarRow { display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--muted); }
+.arc-snapBarRow .barLabel { width: 44px; flex: 0 0 auto; text-align: right; }
+.arc-snapBarTrack { flex: 1; height: 8px; background: var(--accent-soft); border-radius: 4px; overflow: hidden; }
+.arc-snapBarFill { height: 100%; border-radius: 4px; }
+.arc-snapBarVal { width: 52px; flex: 0 0 auto; text-align: left; font-variant-numeric: tabular-nums; }
+
+.arc-flameRow { display: flex; gap: 3px; align-items: center; justify-content: center; margin-top: 6px; flex-wrap: wrap; }
+.arc-flameDot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent-soft); }
+.arc-flameDot.lit { background: var(--accent); }
+.arc-flameMore { font-size: 10.5px; color: var(--muted); margin-left: 2px; }
 
 .arc-budgetInput { width: 74px; background: var(--accent-soft); border: 1px solid var(--line); border-radius: 4px; padding: 2px 4px; font-size: 11px; text-align: right; color: var(--ink); }
 
@@ -1517,6 +1550,67 @@ function SavingsArcade() {
   const minPaymentPct = M > 0 ? round2(totalMinPayments / M * 100) : 0;
   const totalGoalMonthly = data.goals.filter(g => !g.completed).reduce((s, g) => s + (g.monthlyTarget || 0), 0);
   const goalMonthlyPct = M > 0 ? round2(totalGoalMonthly / M * 100) : 0;
+  const totalSpentThisMonth = round2(data.envelopes.reduce((s, e) => s + e.spent, 0));
+  const overBudgetEnvelopes = data.envelopes.filter(e => M > 0 && e.spent > round2(M * (e.pct / 100)));
+  const totalDebtRemaining = round2(data.debts.filter(d => !d.paidOff).reduce((s, d) => s + d.balance, 0));
+  const totalDebtOriginal = round2(data.debts.reduce((s, d) => s + d.originalBalance, 0));
+  const debtPaidPct = totalDebtOriginal > 0 ? round2((totalDebtOriginal - totalDebtRemaining) / totalDebtOriginal * 100) : null;
+  const totalGoalsSaved = round2(data.goals.reduce((s, g) => s + g.saved, 0));
+  const totalGoalsTarget = round2(data.goals.reduce((s, g) => s + g.target, 0));
+  const snapshotOk = M > 0 && overBudgetEnvelopes.length === 0;
+  const Ring = ({
+    pct,
+    color,
+    size = 72,
+    stroke = 7
+  }) => {
+    const clamped = Math.max(0, Math.min(100, pct || 0));
+    const radius = (size - stroke) / 2;
+    const circumference = 2 * Math.PI * radius;
+    const offset = circumference * (1 - clamped / 100);
+    return /*#__PURE__*/React.createElement("svg", {
+      width: size,
+      height: size,
+      viewBox: `0 0 ${size} ${size}`,
+      focusable: "false",
+      style: {
+        outline: "none",
+        boxShadow: "none",
+        border: "none",
+        display: "block",
+        pointerEvents: "none"
+      }
+    }, /*#__PURE__*/React.createElement("circle", {
+      cx: size / 2,
+      cy: size / 2,
+      r: radius,
+      stroke: "var(--accent-soft)",
+      strokeWidth: stroke,
+      fill: "none"
+    }), /*#__PURE__*/React.createElement("circle", {
+      cx: size / 2,
+      cy: size / 2,
+      r: radius,
+      stroke: color,
+      strokeWidth: stroke,
+      fill: "none",
+      strokeDasharray: circumference,
+      strokeDashoffset: offset,
+      strokeLinecap: "round",
+      transform: `rotate(-90 ${size / 2} ${size / 2})`,
+      style: {
+        transition: "stroke-dashoffset 0.4s ease"
+      }
+    }), /*#__PURE__*/React.createElement("text", {
+      x: "50%",
+      y: "50%",
+      textAnchor: "middle",
+      dominantBaseline: "central",
+      fontSize: size * 0.24,
+      fontWeight: "700",
+      fill: "var(--ink)"
+    }, Math.round(clamped), "%"));
+  };
   const segColors = ["#2F5D4E", "#4E7C6D", "#6D9B8C", "#8CBAAB", "#3C6B5B", "#5A897A", "#79A899"];
   const plan = buildPlan(data.bills, data.paychecks, data.debts, data.goals, data.payYourselfFirst, data.planAssignments, data.planExcluded);
   const excludedList = Object.keys(data.planExcluded || {}).map(key => {
@@ -1619,6 +1713,102 @@ function SavingsArcade() {
       marginBottom: 12
     }
   }, "Saving to the cloud..."), activePage === "home" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "arc-snapshot"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "arc-snapshotHead"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "arc-snapshotTitle"
+  }, "Financial Health Snapshot — ", monthLabel(data.currentMonth)), M > 0 && /*#__PURE__*/React.createElement("div", {
+    className: `arc-snapshotStatus ${snapshotOk ? "ok" : "warn"}`
+  }, snapshotOk ? "On track" : `Over budget in ${overBudgetEnvelopes.length} categor${overBudgetEnvelopes.length === 1 ? "y" : "ies"}`)), M <= 0 ? /*#__PURE__*/React.createElement("div", {
+    className: "arc-panelNote"
+  }, "Set your take-home pay below to see your snapshot.") : /*#__PURE__*/React.createElement("div", {
+    className: "arc-snapshotGrid"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "arc-snapStat ring"
+  }, /*#__PURE__*/React.createElement("label", null, "Spent This Month"), /*#__PURE__*/React.createElement(Ring, {
+    pct: totalBudget > 0 ? totalSpentThisMonth / totalBudget * 100 : 0,
+    color: totalSpentThisMonth > totalBudget ? "var(--warn)" : "var(--accent)"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: `arc-snapRingVal arc-mono ${totalSpentThisMonth > totalBudget ? "warn" : ""}`
+  }, fmt(totalSpentThisMonth)), /*#__PURE__*/React.createElement("div", {
+    className: "arc-snapSub"
+  }, "of ", fmt(totalBudget), " budgeted")), /*#__PURE__*/React.createElement("div", {
+    className: "arc-snapStat ring"
+  }, /*#__PURE__*/React.createElement("label", null, "Debt Paid Off"), /*#__PURE__*/React.createElement(Ring, {
+    pct: debtPaidPct || 0,
+    color: "var(--accent)"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "arc-snapRingVal arc-mono"
+  }, fmt(totalDebtRemaining)), /*#__PURE__*/React.createElement("div", {
+    className: "arc-snapSub"
+  }, debtPaidPct != null ? "remaining" : "no debts tracked")), /*#__PURE__*/React.createElement("div", {
+    className: "arc-snapStat ring"
+  }, /*#__PURE__*/React.createElement("label", null, "Saved Toward Goals"), /*#__PURE__*/React.createElement(Ring, {
+    pct: totalGoalsTarget > 0 ? totalGoalsSaved / totalGoalsTarget * 100 : 0,
+    color: "var(--accent)"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "arc-snapRingVal arc-mono"
+  }, fmt(totalGoalsSaved)), /*#__PURE__*/React.createElement("div", {
+    className: "arc-snapSub"
+  }, "of ", fmt(totalGoalsTarget), " total goals")), /*#__PURE__*/React.createElement("div", {
+    className: "arc-snapStat"
+  }, /*#__PURE__*/React.createElement("label", null, "Reward Fund"), /*#__PURE__*/React.createElement("div", {
+    className: "arc-snapValue arc-mono"
+  }, fmt(data.rewardFund)), /*#__PURE__*/React.createElement("div", {
+    className: "arc-snapBars"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "arc-snapBarRow"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "barLabel"
+  }, "Earned"), /*#__PURE__*/React.createElement("div", {
+    className: "arc-snapBarTrack"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "arc-snapBarFill",
+    style: {
+      width: `${Math.min(100, data.rewardFund / 500 * 100)}%`,
+      background: "var(--accent)"
+    }
+  })), /*#__PURE__*/React.createElement("span", {
+    className: "arc-snapBarVal arc-mono"
+  }, fmt(data.rewardFund))), /*#__PURE__*/React.createElement("div", {
+    className: "arc-snapBarRow"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "barLabel"
+  }, "Funded"), /*#__PURE__*/React.createElement("div", {
+    className: "arc-snapBarTrack"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "arc-snapBarFill",
+    style: {
+      width: `${Math.min(100, data.fundedBalance / 500 * 100)}%`,
+      background: "var(--ink)"
+    }
+  })), /*#__PURE__*/React.createElement("span", {
+    className: "arc-snapBarVal arc-mono"
+  }, fmt(data.fundedBalance))))), /*#__PURE__*/React.createElement("div", {
+    className: "arc-snapStat",
+    style: {
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("label", null, "Streak"), /*#__PURE__*/React.createElement("div", {
+    className: "arc-snapValue arc-mono"
+  }, data.streak, " ", data.streak === 1 ? "day" : "days"), /*#__PURE__*/React.createElement("div", {
+    className: "arc-flameRow"
+  }, Array.from({
+    length: Math.min(data.streak, 14)
+  }).map((_, i) => /*#__PURE__*/React.createElement("span", {
+    key: i,
+    className: "arc-flameDot lit"
+  })), Array.from({
+    length: Math.max(0, Math.min(14, 14) - Math.min(data.streak, 14))
+  }).map((_, i) => /*#__PURE__*/React.createElement("span", {
+    key: "e" + i,
+    className: "arc-flameDot"
+  })), data.streak > 14 && /*#__PURE__*/React.createElement("span", {
+    className: "arc-flameMore"
+  }, "+", data.streak - 14)), /*#__PURE__*/React.createElement("div", {
+    className: "arc-snapSub"
+  }, "consecutive activity")))), /*#__PURE__*/React.createElement("div", {
     className: "arc-grid"
   }, /*#__PURE__*/React.createElement("div", {
     className: "arc-panel"
